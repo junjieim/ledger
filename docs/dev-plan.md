@@ -73,3 +73,8 @@ Tasks:
 - Each phase delivers a usable increment
 - Review at end of each phase before proceeding
 - No phase mixing — complete one before starting the next
+
+## Backlog / To Do
+
+- Add a command-run warning when `ZHIPU_API_KEY` is not configured.
+- Add `ledger config` for local API key configuration and related settings management.
