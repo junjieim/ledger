@@ -1,0 +1,42 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/ledger
+/script/ledger
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+*.prof
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (runtime generated)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Environment
+.env
+.env.local
