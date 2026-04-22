@@ -5,7 +5,7 @@
 | Phase | Goal | Deliverable |
 |-------|------|-------------|
 | **Phase 1** | Skeleton + basic CRUD | Working CLI: init, add, delete, update, query, balance |
-| **Phase 2** | Search capability | Hybrid search: FTS5 keyword + sqlite-vec semantic |
+| **Phase 2** | Search capability | Hybrid search: FTS5 keyword + persisted embeddings semantic |
 | **Phase 3** | Complete features | transfer, category mgmt, tag mgmt, audit log |
 | **Phase 4** | Skill packaging | SKILL.md, examples, Makefile, cross-compile |
 
@@ -30,14 +30,18 @@ Tasks:
 
 Tasks:
 1. `internal/tokenizer/gse.go` — gse Chinese tokenization
-2. `internal/search/fts.go` — FTS5 keyword search (pre-tokenized input)
+2. `internal/search` — FTS5 keyword search (pre-tokenized input)
 3. `internal/embedding/zhipu.go` — Zhipu embedding API client
-4. `internal/search/vec.go` — sqlite-vec vector search
-5. `internal/search/hybrid.go` — Score fusion (FTS + vec)
+4. `internal/search` — Persist embeddings and compute cosine similarity
+5. `internal/search` — Score fusion / hybrid ranking
 6. `internal/cli/search.go` — search command
 7. Tests
 
 **Deliverable:** Hybrid Chinese search working end-to-end.
+
+Implementation note:
+- Current Phase 2 uses persisted embeddings + Go-side cosine ranking as the stable baseline.
+- `sqlite-vec` integration is deferred until the runtime compatibility issue is resolved cleanly.
 
 ## Phase 3: Complete Features
 

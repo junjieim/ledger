@@ -56,3 +56,21 @@ type QueryResult struct {
 type BalanceResult struct {
 	Balances []Balance `json:"balances"`
 }
+
+type SearchItem struct {
+	ID            string   `json:"id"`
+	Score         float64  `json:"score"`
+	MatchType     string   `json:"match_type"`
+	Direction     string   `json:"direction"`
+	Amount        float64  `json:"amount"`
+	Currency      string   `json:"currency"`
+	Category      string   `json:"category,omitempty"`
+	Description   string   `json:"description,omitempty"`
+	OccurredAt    string   `json:"occurred_at"`
+	Tags          []string `json:"tags,omitempty"`
+	TransferGroup *string  `json:"transfer_group,omitempty"`
+}
+
+type SearchResult struct {
+	Items []SearchItem `json:"items"`
+}

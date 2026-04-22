@@ -6,7 +6,7 @@
 |-----------|--------|-----------|
 | Language | Go (pure Go, no CGO) | Single binary distribution |
 | SQLite | ncruces/go-sqlite3 | WASM-based, no CGO dependency |
-| Vector Search | sqlite-vec WASM binding | asg017/sqlite-vec-go-bindings/ncruces |
+| Vector Search | Persisted embeddings + Go cosine similarity | Stable Phase 2 baseline; sqlite-vec integration deferred after runtime compatibility issues |
 | CLI Framework | cobra | Industry standard |
 | Chinese Tokenization | gse | Pure Go, github.com/go-ego/gse |
 | Embedding | Zhipu embedding-3 | 2048 dimensions, HTTP API |
@@ -20,7 +20,7 @@ ledger/
 │   ├── db/                      # Connection management, schema (go:embed)
 │   ├── model/                   # Data structures
 │   ├── repo/                    # CRUD + audit logging
-│   ├── search/                  # FTS5 + vec hybrid search
+│   ├── search/                  # FTS5 + semantic hybrid search
 │   ├── embedding/               # Zhipu API client
 │   ├── tokenizer/               # gse tokenization
 │   └── cli/                     # Cobra subcommands
@@ -58,6 +58,13 @@ internal/db — SQLite connection + transactions
     ↓
 internal/search + embedding + tokenizer — Search pipeline
 ```
+
+## Current Search Implementation
+
+- Keyword search uses a dedicated FTS5 table rebuilt from gse-tokenized transaction text.
+- Semantic search stores Zhipu `embedding-3` vectors in SQLite as persisted JSON and computes cosine similarity in Go.
+- Hybrid search uses reciprocal-rank fusion over keyword and semantic result lists.
+- `sqlite-vec` is intentionally deferred for now because its current WASM binding path caused runtime compatibility issues in this environment.
 
 ## Key Design Decisions
 
