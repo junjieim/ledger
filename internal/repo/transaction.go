@@ -22,6 +22,15 @@ type AddTransactionInput struct {
 	OccurredAt  string
 }
 
+type TransferInput struct {
+	FromCurrency string
+	ToCurrency   string
+	FromAmount   float64
+	ToAmount     float64
+	OccurredAt   string
+	Note         *string
+}
+
 func AddTransaction(db *sql.DB, in AddTransactionInput) (*model.Transaction, error) {
 	id := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -70,6 +79,65 @@ func AddTransaction(db *sql.DB, in AddTransactionInput) (*model.Transaction, err
 	}
 
 	return GetTransaction(db, id)
+}
+
+func CreateTransfer(db *sql.DB, in TransferInput) (*model.TransferResult, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	if in.OccurredAt == "" {
+		in.OccurredAt = time.Now().Format("2006-01-02")
+	}
+
+	groupID := "tf-" + uuid.New().String()
+	expenseID := uuid.New().String()
+	incomeID := uuid.New().String()
+
+	expenseDescription := fmt.Sprintf("Transfer to %s", in.ToCurrency)
+	incomeDescription := fmt.Sprintf("Transfer from %s", in.FromCurrency)
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
+		`INSERT INTO transactions (id, direction, amount, currency, transfer_group, description, note, occurred_at, created_at, updated_at)
+		 VALUES (?, 'expense', ?, ?, ?, ?, ?, ?, ?, ?)`,
+		expenseID, in.FromAmount, in.FromCurrency, groupID, expenseDescription, in.Note, in.OccurredAt, now, now,
+	); err != nil {
+		return nil, fmt.Errorf("insert transfer expense: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		`INSERT INTO transactions (id, direction, amount, currency, transfer_group, description, note, occurred_at, created_at, updated_at)
+		 VALUES (?, 'income', ?, ?, ?, ?, ?, ?, ?, ?)`,
+		incomeID, in.ToAmount, in.ToCurrency, groupID, incomeDescription, in.Note, in.OccurredAt, now, now,
+	); err != nil {
+		return nil, fmt.Errorf("insert transfer income: %w", err)
+	}
+
+	if err := logAudit(tx, "create_transfer", "transaction", groupID, in); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	expense, err := GetTransaction(db, expenseID)
+	if err != nil {
+		return nil, err
+	}
+	income, err := GetTransaction(db, incomeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.TransferResult{
+		TransferGroup: groupID,
+		Expense:       expense,
+		Income:        income,
+	}, nil
 }
 
 func ensureTag(tx *sql.Tx, name string) (string, error) {

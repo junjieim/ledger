@@ -74,3 +74,9 @@ type SearchItem struct {
 type SearchResult struct {
 	Items []SearchItem `json:"items"`
 }
+
+type TransferResult struct {
+	TransferGroup string       `json:"transfer_group"`
+	Expense       *Transaction `json:"expense"`
+	Income        *Transaction `json:"income"`
+}

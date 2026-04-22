@@ -50,6 +50,10 @@ func NewRootCmd() *cobra.Command {
 		newQueryCmd(),
 		newSearchCmd(),
 		newBalanceCmd(),
+		newTransferCmd(),
+		newCategoryCmd(),
+		newTagCmd(),
+		newAuditCmd(),
 	)
 
 	return root
