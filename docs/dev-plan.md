@@ -82,3 +82,4 @@ Tasks:
 
 - Add a command-run warning when `ZHIPU_API_KEY` is not configured.
 - Add `ledger config` for local API key configuration and related settings management.
+- Investigate the `sqlite-vec + ncruces/go-sqlite3` WASM runtime compatibility issue and evaluate a clean path back to in-DB vector search.
