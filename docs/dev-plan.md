@@ -31,7 +31,7 @@ Tasks:
 Tasks:
 1. `internal/tokenizer/gse.go` — gse Chinese tokenization
 2. `internal/search` — FTS5 keyword search (pre-tokenized input)
-3. `internal/embedding/zhipu.go` — Zhipu embedding API client
+3. `internal/embedding/client.go` — embedding API client
 4. `internal/search` — Persist embeddings and compute cosine similarity
 5. `internal/search` — Score fusion / hybrid ranking
 6. `internal/cli/search.go` — search command
