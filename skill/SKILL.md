@@ -16,7 +16,7 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 - The working database path is usually `./data/ledger.db`.
 - Run `ledger init` once before first use.
 - Semantic search requires embedding to be configured through `ledger config set`.
-- If no embedding API key is configured, the CLI emits a warning on every command run; this is non-blocking unless a semantic-search path is actually used.
+- If embedding configuration is incomplete, the CLI emits a warning on every non-config command run so the agent or user can fill the missing embedding fields.
 
 ## Operating Rules
 - Do natural-language understanding outside the CLI.
@@ -75,7 +75,7 @@ script/ledger --db ./data/ledger.db search \
 ### Configure Embeddings
 ```bash
 script/ledger --db ./data/ledger.db config set \
-  --api-key "$ZHIPU_API_KEY" \
+  --api-key "<your-embedding-api-key>" \
   --model-name embedding-3 \
   --model-url https://open.bigmodel.cn/api/paas/v4/embeddings \
   --dimensions 2048 \

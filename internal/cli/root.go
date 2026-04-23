@@ -28,7 +28,7 @@ func NewRootCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			warnIfEmbeddingAPIKeyMissing(cmd)
+			warnIfEmbeddingConfigMissing(cmd)
 			return nil
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
@@ -60,7 +60,7 @@ func NewRootCmd() *cobra.Command {
 	return root
 }
 
-func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
+func warnIfEmbeddingConfigMissing(cmd *cobra.Command) {
 	if isConfigCommand(cmd) {
 		return
 	}
@@ -73,11 +73,21 @@ func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
 		fmt.Fprintf(os.Stderr, "Warning: unable to load embedding config: %v\n", err)
 		return
 	}
-	if strings.TrimSpace(settings.APIKey) != "" {
+	missing := missingEmbeddingConfigFields(repoEmbeddingSettings{
+		APIKey:     settings.APIKey,
+		ModelName:  settings.ModelName,
+		ModelURL:   settings.ModelURL,
+		Dimensions: settings.Dimensions,
+	})
+	if len(missing) == 0 {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Warning: embedding is not configured. Run ledger config set before using semantic search.\n")
+	fmt.Fprintf(
+		os.Stderr,
+		"Warning: embedding configuration is incomplete (missing: %s). Run ledger config set to complete embedding setup.\n",
+		strings.Join(missing, ", "),
+	)
 }
 
 func isConfigCommand(cmd *cobra.Command) bool {
@@ -101,4 +111,28 @@ func outputJSON(v interface{}) {
 
 func outputText(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stdout, format, a...)
+}
+
+func missingEmbeddingConfigFields(settings repoEmbeddingSettings) []string {
+	var missing []string
+	if strings.TrimSpace(settings.APIKey) == "" {
+		missing = append(missing, "api_key")
+	}
+	if strings.TrimSpace(settings.ModelName) == "" {
+		missing = append(missing, "model_name")
+	}
+	if strings.TrimSpace(settings.ModelURL) == "" {
+		missing = append(missing, "model_url")
+	}
+	if settings.Dimensions <= 0 {
+		missing = append(missing, "dimensions")
+	}
+	return missing
+}
+
+type repoEmbeddingSettings struct {
+	APIKey     string
+	ModelName  string
+	ModelURL   string
+	Dimensions int
 }

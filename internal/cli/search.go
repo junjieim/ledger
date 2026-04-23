@@ -39,11 +39,11 @@ func newSearchCmd() *cobra.Command {
 				}
 				if strings.TrimSpace(settings.APIKey) == "" {
 					if effectiveMode == "hybrid" && strings.TrimSpace(keyword) != "" {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding is not configured, so hybrid search is returning keyword results only.\n")
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding configuration is incomplete, so hybrid search is returning keyword results only.\n")
 						semantic = ""
 						effectiveMode = "keyword"
 					} else {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding is not configured, so semantic search returned no vector results.\n")
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding configuration is incomplete, so semantic search returned no vector results.\n")
 						return outputSearchResult(&model.SearchResult{Items: []model.SearchItem{}})
 					}
 				}
