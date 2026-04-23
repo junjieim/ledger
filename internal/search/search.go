@@ -55,7 +55,7 @@ func Transactions(db *sql.DB, in Input, embedder *embedding.Client) (*model.Sear
 	}
 
 	if mode == "keyword" || (mode == "hybrid" && strings.TrimSpace(in.Keyword) != "") {
-		if err := rebuildKeywordIndex(db, docs); err != nil {
+		if err := syncKeywordIndex(db, docs); err != nil {
 			return nil, err
 		}
 	}
@@ -208,38 +208,92 @@ func loadDocuments(db *sql.DB) ([]indexedDocument, map[string]*model.Transaction
 	return docs, docMap, nil
 }
 
-func rebuildKeywordIndex(db *sql.DB, docs []indexedDocument) error {
+func syncKeywordIndex(db *sql.DB, docs []indexedDocument) error {
 	if _, err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS transactions_search USING fts5(
 		transaction_id UNINDEXED,
 		content
 	)`); err != nil {
 		return fmt.Errorf("create transactions_search: %w", err)
 	}
-	if _, err := db.Exec(`DELETE FROM transactions_search`); err != nil {
-		return fmt.Errorf("clear transactions_search: %w", err)
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS keyword_index_hashes (
+		transaction_id TEXT PRIMARY KEY,
+		source_hash TEXT NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("create keyword_index_hashes: %w", err)
+	}
+
+	existing := map[string]string{}
+	rows, err := db.Query(`SELECT transaction_id, source_hash FROM keyword_index_hashes`)
+	if err != nil {
+		return fmt.Errorf("load keyword index hashes: %w", err)
+	}
+	for rows.Next() {
+		var id, hash string
+		if err := rows.Scan(&id, &hash); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan keyword index hash: %w", err)
+		}
+		existing[id] = hash
+	}
+	rows.Close()
+
+	currentIDs := make(map[string]struct{}, len(docs))
+	var pending []indexedDocument
+	for _, doc := range docs {
+		currentIDs[doc.Transaction.ID] = struct{}{}
+		if existing[doc.Transaction.ID] != doc.Hash {
+			pending = append(pending, doc)
+		}
+	}
+
+	// Find stale entries (deleted transactions)
+	var staleIDs []string
+	for id := range existing {
+		if _, ok := currentIDs[id]; !ok {
+			staleIDs = append(staleIDs, id)
+		}
+	}
+
+	if len(pending) == 0 && len(staleIDs) == 0 {
+		return nil
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		return fmt.Errorf("begin keyword index rebuild: %w", err)
+		return fmt.Errorf("begin keyword index sync: %w", err)
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Prepare(`INSERT INTO transactions_search (transaction_id, content) VALUES (?, ?)`)
-	if err != nil {
-		return fmt.Errorf("prepare keyword index insert: %w", err)
+	// Remove stale entries
+	for _, id := range staleIDs {
+		if _, err := tx.Exec(`DELETE FROM transactions_search WHERE transaction_id = ?`, id); err != nil {
+			return fmt.Errorf("delete stale keyword index %s: %w", id, err)
+		}
+		if _, err := tx.Exec(`DELETE FROM keyword_index_hashes WHERE transaction_id = ?`, id); err != nil {
+			return fmt.Errorf("delete stale keyword hash %s: %w", id, err)
+		}
 	}
-	defer stmt.Close()
 
-	for _, doc := range docs {
+	// Upsert changed/new entries (FTS5 doesn't support ON CONFLICT, so delete-then-insert)
+	for _, doc := range pending {
+		if _, ok := existing[doc.Transaction.ID]; ok {
+			if _, err := tx.Exec(`DELETE FROM transactions_search WHERE transaction_id = ?`, doc.Transaction.ID); err != nil {
+				return fmt.Errorf("delete old keyword index %s: %w", doc.Transaction.ID, err)
+			}
+		}
 		content, err := tokenizer.TokenizeDocument(doc.SearchText)
 		if err != nil {
 			return fmt.Errorf("tokenize document %s: %w", doc.Transaction.ID, err)
 		}
-		if _, err := stmt.Exec(doc.Transaction.ID, content); err != nil {
-			return fmt.Errorf("insert keyword index for %s: %w", doc.Transaction.ID, err)
+		if _, err := tx.Exec(`INSERT INTO transactions_search (transaction_id, content) VALUES (?, ?)`, doc.Transaction.ID, content); err != nil {
+			return fmt.Errorf("insert keyword index %s: %w", doc.Transaction.ID, err)
+		}
+		if _, err := tx.Exec(`INSERT INTO keyword_index_hashes (transaction_id, source_hash) VALUES (?, ?) ON CONFLICT(transaction_id) DO UPDATE SET source_hash = excluded.source_hash`,
+			doc.Transaction.ID, doc.Hash); err != nil {
+			return fmt.Errorf("upsert keyword hash %s: %w", doc.Transaction.ID, err)
 		}
 	}
+
 	return tx.Commit()
 }
 

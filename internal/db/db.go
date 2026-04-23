@@ -52,6 +52,7 @@ func Init(db *sql.DB) error {
 // InitFresh drops all tables and recreates them.
 func InitFresh(db *sql.DB) error {
 	tables := []string{
+		"keyword_index_hashes",
 		"transactions_search",
 		"transaction_embeddings",
 		"transaction_tags",
