@@ -22,22 +22,43 @@ ledger init --force       # Recreate database (destructive)
 
 ---
 
-### `ledger config`
+### `ledger config set`
 
-Show or update embedding configuration stored in the local database.
+Write the full embedding configuration to the local database.
 
-**Optional update flags:**
-- `--api-key STRING` — Embedding API key
-- `--model-name STRING` — Embedding model name
-- `--model-url STRING` — Embedding endpoint URL
-- `--dimensions INT` — Embedding vector dimensions
-
-If no update flags are provided, the command returns the current config.
+**Required:**
+- `--api-key STRING`
+- `--model-name STRING`
+- `--model-url STRING`
+- `--dimensions INT`
 
 **Output (--json):**
 ```json
 {
-  "api_key": "abcd********wxyz",
+  "model_name": "embedding-3",
+  "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
+  "dimensions": 2048,
+  "updated_at": "2026-04-23T10:00:00Z"
+}
+```
+
+### `ledger config update`
+
+Update one or more embedding config fields in the local database.
+
+**At least one required:**
+- `--api-key STRING`
+- `--model-name STRING`
+- `--model-url STRING`
+- `--dimensions INT`
+
+### `ledger config show`
+
+Show non-secret embedding config fields only.
+
+**Output (--json):**
+```json
+{
   "model_name": "embedding-3",
   "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
   "dimensions": 2048,
@@ -166,7 +187,8 @@ Hybrid search (keyword + semantic vector).
 
 Notes:
 - Semantic and hybrid semantic paths read embedding settings from the DB-backed `ledger config`.
-- If no API key is stored there, `ZHIPU_API_KEY` is still accepted as a fallback.
+- If embedding is not configured, `--mode semantic` fails fast.
+- If embedding is not configured and both `--keyword` and `--semantic` are passed in hybrid mode, the CLI returns keyword results only and emits a warning.
 
 **Output:**
 ```json

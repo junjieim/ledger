@@ -3,7 +3,6 @@ package repo
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -119,16 +118,10 @@ func EffectiveEmbeddingSettings(db *sql.DB) (embedding.Settings, error) {
 		return embedding.Settings{}, err
 	}
 
-	settings := embedding.Settings{
+	return embedding.Settings{
 		APIKey:     cfg.APIKey,
 		ModelName:  cfg.ModelName,
 		ModelURL:   cfg.ModelURL,
 		Dimensions: cfg.Dimensions,
-	}.WithDefaults()
-
-	if settings.APIKey == "" {
-		settings.APIKey = strings.TrimSpace(os.Getenv(embedding.ZhipuAPIKeyEnv))
-	}
-
-	return settings.WithDefaults(), nil
+	}.WithDefaults(), nil
 }

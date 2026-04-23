@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ledger-ai/ledger/internal/db"
-	"github.com/ledger-ai/ledger/internal/embedding"
 	"github.com/ledger-ai/ledger/internal/repo"
 	"github.com/spf13/cobra"
 )
@@ -62,14 +61,10 @@ func NewRootCmd() *cobra.Command {
 }
 
 func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
-	if cmd != nil && cmd.Name() == "config" && cmd.Flags().Changed("api-key") {
+	if isConfigCommand(cmd) {
 		return
 	}
 	if database == nil {
-		if strings.TrimSpace(os.Getenv(embedding.ZhipuAPIKeyEnv)) != "" {
-			return
-		}
-		fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured. Run ledger config --api-key ... or set %s.\n", embedding.ZhipuAPIKeyEnv)
 		return
 	}
 
@@ -82,11 +77,20 @@ func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
 		return
 	}
 
-	if cmd != nil && cmd.Name() == "config" {
-		fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured yet. Use this command to save it.\n")
-		return
+	fmt.Fprintf(os.Stderr, "Warning: embedding is not configured. Run ledger config set or ledger config update before using semantic search.\n")
+}
+
+func isConfigCommand(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
 	}
-	fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured. Run ledger config --api-key ... or set %s.\n", embedding.ZhipuAPIKeyEnv)
+	if cmd.Name() == "config" {
+		return true
+	}
+	if cmd.Parent() != nil && cmd.Parent().Name() == "config" {
+		return true
+	}
+	return false
 }
 
 func outputJSON(v interface{}) {

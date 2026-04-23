@@ -36,6 +36,22 @@ func newSearchCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if strings.TrimSpace(settings.APIKey) == "" {
+					if effectiveMode == "hybrid" && strings.TrimSpace(keyword) != "" {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding is not configured, so hybrid search is returning keyword results only.\n")
+						semantic = ""
+						effectiveMode = "keyword"
+					} else {
+						return fmt.Errorf("embedding is not configured; run ledger config set or ledger config update")
+					}
+				}
+			}
+
+			if (effectiveMode == "semantic" || (effectiveMode == "hybrid" && strings.TrimSpace(semantic) != "")) && strings.TrimSpace(semantic) != "" {
+				settings, err := repo.EffectiveEmbeddingSettings(database)
+				if err != nil {
+					return err
+				}
 				client, err := embedding.NewClient(settings)
 				if err != nil {
 					return err

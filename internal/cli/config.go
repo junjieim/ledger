@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/ledger-ai/ledger/internal/model"
 	"github.com/ledger-ai/ledger/internal/repo"
@@ -9,6 +9,24 @@ import (
 )
 
 func newConfigCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "Manage embedding configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+
+	cmd.AddCommand(
+		newConfigSetCmd(),
+		newConfigUpdateCmd(),
+		newConfigShowCmd(),
+	)
+
+	return cmd
+}
+
+func newConfigSetCmd() *cobra.Command {
 	var (
 		apiKey     string
 		modelName  string
@@ -17,16 +35,59 @@ func newConfigCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Show or update embedding configuration",
+		Use:   "set",
+		Short: "Set embedding configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var (
-				cfg *model.EmbeddingConfig
-				err error
-			)
+			cfg, err := repo.SaveEmbeddingConfig(database, repo.SaveEmbeddingConfigInput{
+				APIKey:     &apiKey,
+				ModelName:  &modelName,
+				ModelURL:   &modelURL,
+				Dimensions: &dimensions,
+			})
+			if err != nil {
+				return err
+			}
 
-			changed := false
+			if jsonOut {
+				outputJSON(publicEmbeddingConfig(cfg))
+				return nil
+			}
+
+			outputText("Embedding config updated\n")
+			outputText("  Model: %s\n", cfg.ModelName)
+			outputText("  URL: %s\n", cfg.ModelURL)
+			outputText("  Dimensions: %d\n", cfg.Dimensions)
+			outputText("  Updated at: %s\n", cfg.UpdatedAt)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&apiKey, "api-key", "", "embedding API key")
+	cmd.Flags().StringVar(&modelName, "model-name", "", "embedding model name")
+	cmd.Flags().StringVar(&modelURL, "model-url", "", "embedding model URL")
+	cmd.Flags().IntVar(&dimensions, "dimensions", 0, "embedding dimensions")
+	must(cmd.MarkFlagRequired("api-key"))
+	must(cmd.MarkFlagRequired("model-name"))
+	must(cmd.MarkFlagRequired("model-url"))
+	must(cmd.MarkFlagRequired("dimensions"))
+
+	return cmd
+}
+
+func newConfigUpdateCmd() *cobra.Command {
+	var (
+		apiKey     string
+		modelName  string
+		modelURL   string
+		dimensions int
+	)
+
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update embedding configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			input := repo.SaveEmbeddingConfigInput{}
+			changed := false
 			if cmd.Flags().Changed("api-key") {
 				changed = true
 				input.APIKey = &apiKey
@@ -43,29 +104,25 @@ func newConfigCmd() *cobra.Command {
 				changed = true
 				input.Dimensions = &dimensions
 			}
-
-			if changed {
-				cfg, err = repo.SaveEmbeddingConfig(database, input)
-			} else {
-				cfg, err = repo.GetEmbeddingConfig(database)
+			if !changed {
+				return fmt.Errorf("at least one config field must be provided")
 			}
+
+			cfg, err := repo.SaveEmbeddingConfig(database, input)
 			if err != nil {
 				return err
 			}
 
-			masked := *cfg
-			masked.APIKey = maskAPIKey(masked.APIKey)
 			if jsonOut {
-				outputJSON(masked)
+				outputJSON(publicEmbeddingConfig(cfg))
 				return nil
 			}
 
-			outputText("Embedding config\n")
-			outputText("  API key: %s\n", masked.APIKey)
-			outputText("  Model: %s\n", masked.ModelName)
-			outputText("  URL: %s\n", masked.ModelURL)
-			outputText("  Dimensions: %d\n", masked.Dimensions)
-			outputText("  Updated at: %s\n", masked.UpdatedAt)
+			outputText("Embedding config updated\n")
+			outputText("  Model: %s\n", cfg.ModelName)
+			outputText("  URL: %s\n", cfg.ModelURL)
+			outputText("  Dimensions: %d\n", cfg.Dimensions)
+			outputText("  Updated at: %s\n", cfg.UpdatedAt)
 			return nil
 		},
 	}
@@ -78,13 +135,45 @@ func newConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func maskAPIKey(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "(not set)"
+func newConfigShowCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "show",
+		Short: "Show non-secret embedding configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := repo.GetEmbeddingConfig(database)
+			if err != nil {
+				return err
+			}
+
+			public := publicEmbeddingConfig(cfg)
+			if jsonOut {
+				outputJSON(public)
+				return nil
+			}
+
+			outputText("Embedding config\n")
+			outputText("  Model: %s\n", public["model_name"])
+			outputText("  URL: %s\n", public["model_url"])
+			outputText("  Dimensions: %d\n", public["dimensions"])
+			outputText("  Updated at: %s\n", public["updated_at"])
+			return nil
+		},
 	}
-	if len(value) <= 8 {
-		return strings.Repeat("*", len(value))
+
+	return cmd
+}
+
+func publicEmbeddingConfig(cfg *model.EmbeddingConfig) map[string]interface{} {
+	return map[string]interface{}{
+		"model_name": cfg.ModelName,
+		"model_url":  cfg.ModelURL,
+		"dimensions": cfg.Dimensions,
+		"updated_at": cfg.UpdatedAt,
 	}
-	return value[:4] + strings.Repeat("*", len(value)-8) + value[len(value)-4:]
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

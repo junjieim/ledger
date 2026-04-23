@@ -86,7 +86,7 @@ func (s Settings) WithDefaults() Settings {
 func (s Settings) Validate(requireAPIKey bool) error {
 	s = s.WithDefaults()
 	if requireAPIKey && s.APIKey == "" {
-		return fmt.Errorf("embedding API key is not configured; set it with ledger config --api-key or %s", ZhipuAPIKeyEnv)
+		return fmt.Errorf("embedding is not configured; run ledger config set or ledger config update")
 	}
 	if s.ModelName == "" {
 		return fmt.Errorf("model name is required")
