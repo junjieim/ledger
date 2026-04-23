@@ -157,6 +157,8 @@ func ensureTag(tx *sql.Tx, name string) (string, error) {
 func GetTransaction(db *sql.DB, id string) (*model.Transaction, error) {
 	t := &model.Transaction{}
 	var catName sql.NullString
+	var createdAt model.SQLiteTime
+	var updatedAt model.SQLiteTime
 	err := db.QueryRow(
 		`SELECT t.id, t.direction, t.amount, t.currency, t.transfer_group,
 		        t.category_id, c.name, t.description, t.raw_input, t.note,
@@ -166,10 +168,12 @@ func GetTransaction(db *sql.DB, id string) (*model.Transaction, error) {
 		 WHERE t.id = ?`, id,
 	).Scan(&t.ID, &t.Direction, &t.Amount, &t.Currency, &t.TransferGroup,
 		&t.CategoryID, &catName, &t.Description, &t.RawInput, &t.Note,
-		&t.OccurredAt, &t.CreatedAt, &t.UpdatedAt)
+		&t.OccurredAt, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
+	t.CreatedAt = createdAt.Time
+	t.UpdatedAt = updatedAt.Time
 	if catName.Valid {
 		t.Category = catName.String
 	}
@@ -396,11 +400,15 @@ func QueryTransactions(db *sql.DB, in QueryInput) (*model.QueryResult, error) {
 	for rows.Next() {
 		t := &model.Transaction{}
 		var catName sql.NullString
+		var createdAt model.SQLiteTime
+		var updatedAt model.SQLiteTime
 		if err := rows.Scan(&t.ID, &t.Direction, &t.Amount, &t.Currency, &t.TransferGroup,
 			&t.CategoryID, &catName, &t.Description, &t.RawInput, &t.Note,
-			&t.OccurredAt, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			&t.OccurredAt, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
+		t.CreatedAt = createdAt.Time
+		t.UpdatedAt = updatedAt.Time
 		if catName.Valid {
 			t.Category = catName.String
 		}

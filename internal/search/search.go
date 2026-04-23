@@ -180,13 +180,17 @@ func loadDocuments(db *sql.DB) ([]indexedDocument, map[string]*model.Transaction
 		tx := &model.Transaction{}
 		var category sql.NullString
 		var tagsJoined string
+		var createdAt model.SQLiteTime
+		var updatedAt model.SQLiteTime
 		if err := rows.Scan(
 			&tx.ID, &tx.Direction, &tx.Amount, &tx.Currency, &tx.TransferGroup,
 			&tx.CategoryID, &category, &tx.Description, &tx.RawInput, &tx.Note,
-			&tx.OccurredAt, &tx.CreatedAt, &tx.UpdatedAt, &tagsJoined,
+			&tx.OccurredAt, &createdAt, &updatedAt, &tagsJoined,
 		); err != nil {
 			return nil, nil, fmt.Errorf("scan search document: %w", err)
 		}
+		tx.CreatedAt = createdAt.Time
+		tx.UpdatedAt = updatedAt.Time
 		if category.Valid {
 			tx.Category = category.String
 		}

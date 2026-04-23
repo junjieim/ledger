@@ -81,5 +81,5 @@ Tasks:
 
 ## Backlog / To Do
 
-- Investigate the `sqlite-vec + ncruces/go-sqlite3` WASM runtime compatibility issue and evaluate a clean path back to in-DB vector search.
+- Investigate a clean path back to stable in-DB vector search on top of the current SQLite driver stack.
 - Add unit tests and baseline regression coverage for the Ledger CLI and repo layers.

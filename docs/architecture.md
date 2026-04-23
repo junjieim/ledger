@@ -5,7 +5,7 @@
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
 | Language | Go (pure Go, no CGO) | Single binary distribution |
-| SQLite | ncruces/go-sqlite3 | WASM-based, no CGO dependency |
+| SQLite | modernc.org/sqlite | Pure-Go SQLite driver, no CGO dependency |
 | Vector Search | Persisted embeddings + Go cosine similarity | Stable Phase 2 baseline; sqlite-vec integration deferred after runtime compatibility issues |
 | CLI Framework | cobra | Industry standard |
 | Chinese Tokenization | gse | Pure Go, github.com/go-ego/gse |
@@ -65,7 +65,7 @@ internal/search + embedding + tokenizer — Search pipeline
 - Semantic search stores embedding runtime settings in a DB-backed `embedding_config` table, persists vectors in SQLite as JSON, and computes cosine similarity in Go.
 - The embedding cache is keyed by both document hash and embedding config signature (model name, URL, dimensions), so dimension or model changes trigger a clean re-embed path.
 - Hybrid search uses reciprocal-rank fusion over keyword and semantic result lists.
-- `sqlite-vec` is intentionally deferred for now because its current WASM binding path caused runtime compatibility issues in this environment.
+- `sqlite-vec` is intentionally deferred for now because the current in-DB vector-search integrations we evaluated are not yet stable enough for this project.
 
 ## Key Design Decisions
 
