@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ledger-ai/ledger/internal/embedding"
+	"github.com/ledger-ai/ledger/internal/repo"
 	"github.com/ledger-ai/ledger/internal/search"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +32,11 @@ func newSearchCmd() *cobra.Command {
 				effectiveMode = "hybrid"
 			}
 			if (effectiveMode == "semantic" || (effectiveMode == "hybrid" && strings.TrimSpace(semantic) != "")) && strings.TrimSpace(semantic) != "" {
-				client, err := embedding.NewClientFromEnv()
+				settings, err := repo.EffectiveEmbeddingSettings(database)
+				if err != nil {
+					return err
+				}
+				client, err := embedding.NewClient(settings)
 				if err != nil {
 					return err
 				}

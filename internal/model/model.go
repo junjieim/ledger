@@ -80,3 +80,11 @@ type TransferResult struct {
 	Expense       *Transaction `json:"expense"`
 	Income        *Transaction `json:"income"`
 }
+
+type EmbeddingConfig struct {
+	APIKey     string `json:"api_key,omitempty"`
+	ModelName  string `json:"model_name"`
+	ModelURL   string `json:"model_url"`
+	Dimensions int    `json:"dimensions"`
+	UpdatedAt  string `json:"updated_at,omitempty"`
+}

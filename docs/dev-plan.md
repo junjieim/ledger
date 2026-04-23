@@ -41,6 +41,7 @@ Tasks:
 
 Implementation note:
 - Current Phase 2 uses persisted embeddings + Go-side cosine ranking as the stable baseline.
+- Embedding runtime settings now live in a DB-backed `embedding_config` table and are managed through `ledger config`.
 - `sqlite-vec` integration is deferred until the runtime compatibility issue is resolved cleanly.
 
 ## Phase 3: Complete Features
@@ -80,7 +81,5 @@ Tasks:
 
 ## Backlog / To Do
 
-- Add `ledger config` for local API key configuration and related settings management.
 - Investigate the `sqlite-vec + ncruces/go-sqlite3` WASM runtime compatibility issue and evaluate a clean path back to in-DB vector search.
-- Optimize keyword search to avoid rebuilding the full FTS index on every query.
 - Add unit tests and baseline regression coverage for the Ledger CLI and repo layers.

@@ -61,7 +61,7 @@ func Transactions(db *sql.DB, in Input, embedder *embedding.Client) (*model.Sear
 	}
 	if mode == "semantic" || (mode == "hybrid" && strings.TrimSpace(in.Semantic) != "") {
 		if embedder == nil {
-			return nil, fmt.Errorf("semantic search requires %s", embedding.ZhipuAPIKeyEnv)
+			return nil, fmt.Errorf("semantic search requires embedding API key configuration")
 		}
 		if err := syncEmbeddings(context.Background(), db, docs, embedder); err != nil {
 			return nil, err
@@ -342,29 +342,32 @@ func keywordSearch(db *sql.DB, keyword string, limit int) ([]scoredMatch, error)
 }
 
 func syncEmbeddings(ctx context.Context, db *sql.DB, docs []indexedDocument, embedder *embedding.Client) error {
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS transaction_embeddings (
-		transaction_id TEXT PRIMARY KEY,
-		source_hash TEXT NOT NULL,
-		embedding_json TEXT NOT NULL,
-		updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-		FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
-	)`); err != nil {
-		return fmt.Errorf("create transaction_embeddings: %w", err)
+	if err := ensureTransactionEmbeddingsTable(db); err != nil {
+		return err
 	}
 
-	existing := map[string]string{}
-	rows, err := db.Query(`SELECT transaction_id, source_hash FROM transaction_embeddings`)
+	type storedEmbedding struct {
+		SourceHash      string
+		ConfigSignature string
+		Dimensions      int
+	}
+
+	settings := embedder.Settings()
+	configSignature := embedding.ConfigSignature(settings)
+
+	existing := map[string]storedEmbedding{}
+	rows, err := db.Query(`SELECT transaction_id, source_hash, config_signature, dimensions FROM transaction_embeddings`)
 	if err != nil {
 		return fmt.Errorf("load existing embeddings: %w", err)
 	}
 	for rows.Next() {
 		var id string
-		var hash string
-		if err := rows.Scan(&id, &hash); err != nil {
+		var item storedEmbedding
+		if err := rows.Scan(&id, &item.SourceHash, &item.ConfigSignature, &item.Dimensions); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan existing embedding: %w", err)
 		}
-		existing[id] = hash
+		existing[id] = item
 	}
 	rows.Close()
 
@@ -372,7 +375,8 @@ func syncEmbeddings(ctx context.Context, db *sql.DB, docs []indexedDocument, emb
 	var pending []indexedDocument
 	for _, doc := range docs {
 		currentIDs[doc.Transaction.ID] = struct{}{}
-		if existing[doc.Transaction.ID] != doc.Hash {
+		stored, ok := existing[doc.Transaction.ID]
+		if !ok || stored.SourceHash != doc.Hash || stored.ConfigSignature != configSignature || stored.Dimensions != settings.Dimensions {
 			pending = append(pending, doc)
 		}
 	}
@@ -407,10 +411,12 @@ func syncEmbeddings(ctx context.Context, db *sql.DB, docs []indexedDocument, emb
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO transaction_embeddings (transaction_id, source_hash, embedding_json, updated_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO transaction_embeddings (transaction_id, source_hash, config_signature, dimensions, embedding_json, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(transaction_id) DO UPDATE SET
 			source_hash = excluded.source_hash,
+			config_signature = excluded.config_signature,
+			dimensions = excluded.dimensions,
 			embedding_json = excluded.embedding_json,
 			updated_at = excluded.updated_at
 	`)
@@ -425,7 +431,7 @@ func syncEmbeddings(ctx context.Context, db *sql.DB, docs []indexedDocument, emb
 		if err != nil {
 			return fmt.Errorf("encode embedding for %s: %w", doc.Transaction.ID, err)
 		}
-		if _, err := stmt.Exec(doc.Transaction.ID, doc.Hash, vectorJSON, now); err != nil {
+		if _, err := stmt.Exec(doc.Transaction.ID, doc.Hash, configSignature, settings.Dimensions, vectorJSON, now); err != nil {
 			return fmt.Errorf("upsert embedding for %s: %w", doc.Transaction.ID, err)
 		}
 	}
@@ -545,6 +551,78 @@ func vectorToJSON(vector []float32) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func ensureTransactionEmbeddingsTable(db *sql.DB) error {
+	var tableName string
+	err := db.QueryRow(`
+		SELECT name
+		FROM sqlite_master
+		WHERE type = 'table' AND name = 'transaction_embeddings'
+	`).Scan(&tableName)
+	if err == sql.ErrNoRows {
+		return createTransactionEmbeddingsTable(db)
+	}
+	if err != nil {
+		return fmt.Errorf("check transaction_embeddings table: %w", err)
+	}
+
+	rows, err := db.Query(`PRAGMA table_info(transaction_embeddings)`)
+	if err != nil {
+		return fmt.Errorf("inspect transaction_embeddings table: %w", err)
+	}
+	defer rows.Close()
+
+	required := map[string]struct{}{
+		"transaction_id":   {},
+		"source_hash":      {},
+		"config_signature": {},
+		"dimensions":       {},
+		"embedding_json":   {},
+		"updated_at":       {},
+	}
+	found := map[string]struct{}{}
+	for rows.Next() {
+		var (
+			cid        int
+			name       string
+			columnType string
+			notNull    int
+			defaultVal sql.NullString
+			pk         int
+		)
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultVal, &pk); err != nil {
+			return fmt.Errorf("scan transaction_embeddings table info: %w", err)
+		}
+		found[name] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate transaction_embeddings table info: %w", err)
+	}
+	for name := range required {
+		if _, ok := found[name]; !ok {
+			if _, err := db.Exec(`DROP TABLE IF EXISTS transaction_embeddings`); err != nil {
+				return fmt.Errorf("drop legacy transaction_embeddings table: %w", err)
+			}
+			return createTransactionEmbeddingsTable(db)
+		}
+	}
+	return nil
+}
+
+func createTransactionEmbeddingsTable(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS transaction_embeddings (
+		transaction_id TEXT PRIMARY KEY,
+		source_hash TEXT NOT NULL,
+		config_signature TEXT NOT NULL,
+		dimensions INTEGER NOT NULL,
+		embedding_json TEXT NOT NULL,
+		updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+	)`); err != nil {
+		return fmt.Errorf("create transaction_embeddings: %w", err)
+	}
+	return nil
 }
 
 func cosineSimilarity(a, b []float32) float64 {

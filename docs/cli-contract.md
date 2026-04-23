@@ -22,6 +22,31 @@ ledger init --force       # Recreate database (destructive)
 
 ---
 
+### `ledger config`
+
+Show or update embedding configuration stored in the local database.
+
+**Optional update flags:**
+- `--api-key STRING` — Embedding API key
+- `--model-name STRING` — Embedding model name
+- `--model-url STRING` — Embedding endpoint URL
+- `--dimensions INT` — Embedding vector dimensions
+
+If no update flags are provided, the command returns the current config.
+
+**Output (--json):**
+```json
+{
+  "api_key": "abcd********wxyz",
+  "model_name": "embedding-3",
+  "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
+  "dimensions": 2048,
+  "updated_at": "2026-04-23T10:00:00Z"
+}
+```
+
+---
+
 ### `ledger add`
 
 Add a transaction.
@@ -138,6 +163,10 @@ Hybrid search (keyword + semantic vector).
 **Optional:**
 - `--mode STRING` — `keyword` | `semantic` | `hybrid` (default `hybrid`)
 - `--limit INT` — Max results (default 10)
+
+Notes:
+- Semantic and hybrid semantic paths read embedding settings from the DB-backed `ledger config`.
+- If no API key is stored there, `ZHIPU_API_KEY` is still accepted as a fallback.
 
 **Output:**
 ```json

@@ -14,13 +14,6 @@ func newInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize the ledger database",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := db.Open(dbPath)
-			if err != nil {
-				return err
-			}
-			defer d.Close()
-			database = d
-
 			if force {
 				if err := db.InitFresh(database); err != nil {
 					return fmt.Errorf("init fresh: %w", err)

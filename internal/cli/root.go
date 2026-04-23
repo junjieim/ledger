@@ -9,6 +9,7 @@ import (
 
 	"github.com/ledger-ai/ledger/internal/db"
 	"github.com/ledger-ai/ledger/internal/embedding"
+	"github.com/ledger-ai/ledger/internal/repo"
 	"github.com/spf13/cobra"
 )
 
@@ -23,22 +24,18 @@ func NewRootCmd() *cobra.Command {
 		Use:   "ledger",
 		Short: "AI-agent friendly ledger CLI",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			warnIfZhipuAPIKeyMissing()
-
-			// Skip DB open for init --force (it handles its own)
-			if cmd.Name() == "init" {
-				return nil
-			}
 			var err error
 			database, err = db.Open(dbPath)
 			if err != nil {
 				return err
 			}
+			warnIfEmbeddingAPIKeyMissing(cmd)
 			return nil
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
 			if database != nil {
 				database.Close()
+				database = nil
 			}
 		},
 	}
@@ -48,6 +45,7 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newInitCmd(),
+		newConfigCmd(),
 		newAddCmd(),
 		newDeleteCmd(),
 		newUpdateCmd(),
@@ -63,11 +61,32 @@ func NewRootCmd() *cobra.Command {
 	return root
 }
 
-func warnIfZhipuAPIKeyMissing() {
-	if strings.TrimSpace(os.Getenv(embedding.ZhipuAPIKeyEnv)) != "" {
+func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
+	if cmd != nil && cmd.Name() == "config" && cmd.Flags().Changed("api-key") {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "Warning: %s is not set. Semantic search and embedding sync will not work until it is configured.\n", embedding.ZhipuAPIKeyEnv)
+	if database == nil {
+		if strings.TrimSpace(os.Getenv(embedding.ZhipuAPIKeyEnv)) != "" {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured. Run ledger config --api-key ... or set %s.\n", embedding.ZhipuAPIKeyEnv)
+		return
+	}
+
+	settings, err := repo.EffectiveEmbeddingSettings(database)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: unable to load embedding config: %v\n", err)
+		return
+	}
+	if strings.TrimSpace(settings.APIKey) != "" {
+		return
+	}
+
+	if cmd != nil && cmd.Name() == "config" {
+		fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured yet. Use this command to save it.\n")
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Warning: embedding API key is not configured. Run ledger config --api-key ... or set %s.\n", embedding.ZhipuAPIKeyEnv)
 }
 
 func outputJSON(v interface{}) {

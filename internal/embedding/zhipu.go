@@ -3,6 +3,8 @@ package embedding
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,7 +22,15 @@ const (
 	defaultRequestTimeout = 60 * time.Second
 )
 
+type Settings struct {
+	APIKey     string
+	ModelName  string
+	ModelURL   string
+	Dimensions int
+}
+
 type Client struct {
+	settings   Settings
 	apiKey     string
 	httpClient *http.Client
 	endpoint   string
@@ -48,20 +58,84 @@ type errorPayload struct {
 	Message string `json:"message"`
 }
 
-func NewClientFromEnv() (*Client, error) {
-	key := strings.TrimSpace(os.Getenv(ZhipuAPIKeyEnv))
-	if key == "" {
-		return nil, fmt.Errorf("%s is not set", ZhipuAPIKeyEnv)
+func DefaultSettings() Settings {
+	return Settings{
+		ModelName:  defaultModel,
+		ModelURL:   defaultEndpoint,
+		Dimensions: defaultDimensions,
 	}
+}
+
+func (s Settings) WithDefaults() Settings {
+	defaults := DefaultSettings()
+	if strings.TrimSpace(s.ModelName) == "" {
+		s.ModelName = defaults.ModelName
+	}
+	if strings.TrimSpace(s.ModelURL) == "" {
+		s.ModelURL = defaults.ModelURL
+	}
+	if s.Dimensions <= 0 {
+		s.Dimensions = defaults.Dimensions
+	}
+	s.APIKey = strings.TrimSpace(s.APIKey)
+	s.ModelName = strings.TrimSpace(s.ModelName)
+	s.ModelURL = strings.TrimSpace(s.ModelURL)
+	return s
+}
+
+func (s Settings) Validate(requireAPIKey bool) error {
+	s = s.WithDefaults()
+	if requireAPIKey && s.APIKey == "" {
+		return fmt.Errorf("embedding API key is not configured; set it with ledger config --api-key or %s", ZhipuAPIKeyEnv)
+	}
+	if s.ModelName == "" {
+		return fmt.Errorf("model name is required")
+	}
+	if s.ModelURL == "" {
+		return fmt.Errorf("model URL is required")
+	}
+	if s.Dimensions <= 0 {
+		return fmt.Errorf("dimensions must be positive")
+	}
+	return nil
+}
+
+func NewClient(settings Settings) (*Client, error) {
+	settings = settings.WithDefaults()
+	if err := settings.Validate(true); err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		apiKey: key,
+		settings: settings,
+		apiKey:   settings.APIKey,
 		httpClient: &http.Client{
 			Timeout: defaultRequestTimeout,
 		},
-		endpoint:   defaultEndpoint,
-		model:      defaultModel,
-		dimensions: defaultDimensions,
+		endpoint:   settings.ModelURL,
+		model:      settings.ModelName,
+		dimensions: settings.Dimensions,
 	}, nil
+}
+
+func NewClientFromEnv() (*Client, error) {
+	settings := DefaultSettings()
+	settings.APIKey = strings.TrimSpace(os.Getenv(ZhipuAPIKeyEnv))
+	return NewClient(settings)
+}
+
+func (c *Client) Settings() Settings {
+	return c.settings
+}
+
+func ConfigSignature(settings Settings) string {
+	settings = settings.WithDefaults()
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		settings.ModelName,
+		settings.ModelURL,
+		fmt.Sprintf("%d", settings.Dimensions),
+	}, "\n")))
+	return hex.EncodeToString(sum[:])
 }
 
 func (c *Client) EmbedTexts(ctx context.Context, texts []string) ([][]float32, error) {

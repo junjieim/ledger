@@ -1,6 +1,6 @@
 -- ==========================================
 -- Ledger Schema V1 (Finalized 2026-04-22)
--- SQLite + sqlite-vec + FTS5 (gse pre-tokenized)
+-- SQLite + persisted embeddings + FTS5 (gse pre-tokenized)
 -- ==========================================
 
 PRAGMA journal_mode = WAL;
@@ -83,41 +83,32 @@ CREATE INDEX idx_audit_log_agent   ON audit_log(agent_id);
 CREATE INDEX idx_audit_log_created ON audit_log(created_at);
 
 -- -------------------------------------------
--- 5. 全文搜索（FTS5，应用层 gse 预分词）
+-- 5. Embedding 配置
 -- -------------------------------------------
-CREATE VIRTUAL TABLE transactions_fts USING fts5(
-  description,
-  raw_input,
-  note,
-  content = 'transactions',
-  content_rowid = 'rowid'
+CREATE TABLE embedding_config (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  api_key     TEXT,
+  model_name  TEXT NOT NULL,
+  model_url   TEXT NOT NULL,
+  dimensions  INTEGER NOT NULL,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- FTS 同步触发器
-CREATE TRIGGER trg_transactions_ai AFTER INSERT ON transactions BEGIN
-  INSERT INTO transactions_fts(rowid, description, raw_input, note)
-  VALUES (new.rowid, new.description, new.raw_input, new.note);
-END;
-
-CREATE TRIGGER trg_transactions_ad AFTER DELETE ON transactions BEGIN
-  INSERT INTO transactions_fts(transactions_fts, rowid, description, raw_input, note)
-  VALUES ('delete', old.rowid, old.description, old.raw_input, old.note);
-END;
-
-CREATE TRIGGER trg_transactions_au AFTER UPDATE ON transactions BEGIN
-  INSERT INTO transactions_fts(transactions_fts, rowid, description, raw_input, note)
-  VALUES ('delete', old.rowid, old.description, old.raw_input, old.note);
-  INSERT INTO transactions_fts(rowid, description, raw_input, note)
-  VALUES (new.rowid, new.description, new.raw_input, new.note);
-END;
-
 -- -------------------------------------------
--- 6. 向量搜索（基于 description 字段）（sqlite-vec, 智谱 embedding-3, 2048维）
+-- 6. 持久化向量缓存（由应用层维护）
 -- -------------------------------------------
-CREATE VIRTUAL TABLE transactions_vec USING vec0(
-  transaction_id TEXT PRIMARY KEY,
-  embedding      float[2048]
+CREATE TABLE transaction_embeddings (
+  transaction_id    TEXT PRIMARY KEY,
+  source_hash       TEXT NOT NULL,
+  config_signature  TEXT NOT NULL,
+  dimensions        INTEGER NOT NULL,
+  embedding_json    TEXT NOT NULL,
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 );
+
+INSERT INTO embedding_config (id, api_key, model_name, model_url, dimensions) VALUES
+  (1, '', 'embedding-3', 'https://open.bigmodel.cn/api/paas/v4/embeddings', 2048);
 
 -- -------------------------------------------
 -- 7. 预置分类
@@ -130,7 +121,7 @@ INSERT INTO categories (id, name, direction) VALUES
   ('cat-entertain',  '娱乐', 'expense'),
   ('cat-health',     '医疗', 'expense'),
   ('cat-parenting',  '育儿', 'expense'),
-  ('cat-social',     '人情', 'expense'),
+  ('cat-social',     '人情', 'both'),
   ('cat-salary',     '工资', 'income'),
   ('cat-investment', '投资收益', 'income'),
   ('cat-freelance',  '兼职', 'income'),

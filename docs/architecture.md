@@ -62,7 +62,8 @@ internal/search + embedding + tokenizer — Search pipeline
 ## Current Search Implementation
 
 - Keyword search uses a dedicated FTS5 table rebuilt from gse-tokenized transaction text.
-- Semantic search stores Zhipu `embedding-3` vectors in SQLite as persisted JSON and computes cosine similarity in Go.
+- Semantic search stores embedding runtime settings in a DB-backed `embedding_config` table, persists vectors in SQLite as JSON, and computes cosine similarity in Go.
+- The embedding cache is keyed by both document hash and embedding config signature (model name, URL, dimensions), so dimension or model changes trigger a clean re-embed path.
 - Hybrid search uses reciprocal-rank fusion over keyword and semantic result lists.
 - `sqlite-vec` is intentionally deferred for now because its current WASM binding path caused runtime compatibility issues in this environment.
 
