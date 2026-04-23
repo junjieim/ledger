@@ -35,11 +35,16 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 
 ## Core Workflow
 1. Ensure the database exists: `script/ledger --db ./data/ledger.db init`
-2. Convert the request into one CLI command.
-3. Execute the command with `--json` when downstream parsing matters.
-4. Summarize the result for the user in natural language.
+2. Before `add`, check existing categories and tags first when classification or tagging is not obvious:
+   `script/ledger --db ./data/ledger.db category list --json`
+   `script/ledger --db ./data/ledger.db tag list --json`
+3. Convert the request into one CLI command.
+4. Execute the command with `--json` when downstream parsing matters.
+5. Summarize the result for the user in natural language.
 
 ## Add Guidance
+- Prefer reusing existing categories and tags before creating or inferring new ones.
+- Query the current category/tag lists first if there is any ambiguity, so the ledger stays consistent over time.
 - Start from the objective fact and choose one category for that fact.
 - Then extract searchable attributes into tags.
 - If the user expresses a feeling, judgment, or side context, prefer tags or note instead of category.
@@ -69,6 +74,12 @@ script/ledger --db ./data/ledger.db add \
 
 ### Add A Transaction
 Prefer the fullest deterministic command you can infer.
+When useful, inspect existing categories/tags before writing:
+
+```bash
+script/ledger --db ./data/ledger.db category list --json
+script/ledger --db ./data/ledger.db tag list --json
+```
 
 ```bash
 script/ledger --db ./data/ledger.db add \
