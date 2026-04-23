@@ -113,6 +113,7 @@ script/ledger --db ./data/ledger.db audit --limit 20 --json
 - "标签" => `tag`
 - "审计" / "历史操作" => `audit`
 
+## Safety Notes
 - `search --semantic` returns an empty result and warning if embedding has not been configured through `ledger config set`.
 - Hybrid search with both `--keyword` and `--semantic` degrades to keyword-only when embedding is not configured, and emits a warning explaining that semantic results are omitted.
 - The CLI also emits a non-blocking warning on each non-config command run when embedding is not configured.
