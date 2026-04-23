@@ -16,6 +16,7 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 - The working database path is usually `./data/ledger.db`.
 - Run `ledger init` once before first use.
 - Semantic search requires `ZHIPU_API_KEY` in the environment.
+- If `ZHIPU_API_KEY` is missing, the CLI emits a warning on every command run; this is non-blocking unless a semantic-search path is actually used.
 
 ## Operating Rules
 - Do natural-language understanding outside the CLI.
@@ -104,5 +105,6 @@ script/ledger --db ./data/ledger.db audit --limit 20 --json
 
 ## Safety Notes
 - `search --semantic` and hybrid semantic mode will fail fast if `ZHIPU_API_KEY` is missing.
+- The CLI also emits a non-blocking warning on each command run when `ZHIPU_API_KEY` is unset.
 - `category remove --force` detaches referenced transactions and child categories first.
 - `delete` removes both legs of a transfer automatically when the target transaction belongs to a transfer group.

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/ledger-ai/ledger/internal/db"
+	"github.com/ledger-ai/ledger/internal/embedding"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +23,8 @@ func NewRootCmd() *cobra.Command {
 		Use:   "ledger",
 		Short: "AI-agent friendly ledger CLI",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			warnIfZhipuAPIKeyMissing()
+
 			// Skip DB open for init --force (it handles its own)
 			if cmd.Name() == "init" {
 				return nil
@@ -57,6 +61,13 @@ func NewRootCmd() *cobra.Command {
 	)
 
 	return root
+}
+
+func warnIfZhipuAPIKeyMissing() {
+	if strings.TrimSpace(os.Getenv(embedding.ZhipuAPIKeyEnv)) != "" {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Warning: %s is not set. Semantic search and embedding sync will not work until it is configured.\n", embedding.ZhipuAPIKeyEnv)
 }
 
 func outputJSON(v interface{}) {
