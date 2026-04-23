@@ -13,12 +13,6 @@ CREATE TABLE IF NOT EXISTS categories (
 
 CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
 
-CREATE TABLE IF NOT EXISTS currency_meta (
-  code       TEXT PRIMARY KEY CHECK(code GLOB '[A-Z][A-Z][A-Z]'),
-  name       TEXT NOT NULL,
-  precision  INTEGER NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS transactions (
   id              TEXT PRIMARY KEY,
   direction       TEXT NOT NULL CHECK(direction IN ('income', 'expense')),
@@ -70,37 +64,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_target  ON audit_log(target_type, targe
 CREATE INDEX IF NOT EXISTS idx_audit_log_agent   ON audit_log(agent_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 
--- FTS5 for keyword search (app-layer gse pre-tokenization)
-CREATE VIRTUAL TABLE IF NOT EXISTS transactions_fts USING fts5(
-  description,
-  raw_input,
-  note,
-  content = 'transactions',
-  content_rowid = 'rowid'
-);
-
-CREATE TRIGGER IF NOT EXISTS trg_transactions_ai AFTER INSERT ON transactions BEGIN
-  INSERT INTO transactions_fts(rowid, description, raw_input, note)
-  VALUES (new.rowid, new.description, new.raw_input, new.note);
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_transactions_ad AFTER DELETE ON transactions BEGIN
-  INSERT INTO transactions_fts(transactions_fts, rowid, description, raw_input, note)
-  VALUES ('delete', old.rowid, old.description, old.raw_input, old.note);
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_transactions_au AFTER UPDATE ON transactions BEGIN
-  INSERT INTO transactions_fts(transactions_fts, rowid, description, raw_input, note)
-  VALUES ('delete', old.rowid, old.description, old.raw_input, old.note);
-  INSERT INTO transactions_fts(rowid, description, raw_input, note)
-  VALUES (new.rowid, new.description, new.raw_input, new.note);
-END;
-
--- NOTE:
--- sqlite-vec is part of Phase 2 search work. The production schema is expected
--- to add a real vector table later, but Phase 1 should remain runnable without
--- loading the sqlite-vec extension at init time.
-
 -- Seed default categories (ignore if already exist)
 INSERT OR IGNORE INTO categories (id, name, direction) VALUES
   ('cat-food',       '餐饮', 'expense'),
@@ -109,17 +72,10 @@ INSERT OR IGNORE INTO categories (id, name, direction) VALUES
   ('cat-housing',    '住房', 'expense'),
   ('cat-entertain',  '娱乐', 'expense'),
   ('cat-health',     '医疗', 'expense'),
-  ('cat-education',  '教育', 'expense'),
+  ('cat-parenting',  '育儿', 'expense'),
   ('cat-salary',     '工资', 'income'),
   ('cat-investment', '投资收益', 'income'),
   ('cat-freelance',  '兼职', 'income'),
   ('cat-gift',       '礼金', 'both'),
+  ('cat-social',     '人情', 'both'),
   ('cat-other',      '其他', 'both');
-
-INSERT OR IGNORE INTO currency_meta (code, name, precision) VALUES
-  ('CNY', 'Chinese Yuan', 2),
-  ('USD', 'US Dollar', 2),
-  ('EUR', 'Euro', 2),
-  ('GBP', 'British Pound', 2),
-  ('JPY', 'Japanese Yen', 0),
-  ('HKD', 'Hong Kong Dollar', 2);

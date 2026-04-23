@@ -53,13 +53,11 @@ func Init(db *sql.DB) error {
 func InitFresh(db *sql.DB) error {
 	tables := []string{
 		"transactions_search",
-		"transactions_fts",
 		"transaction_embeddings",
 		"transaction_tags",
 		"tags",
 		"audit_log",
 		"transactions",
-		"currency_meta",
 		"categories",
 	}
 	for _, t := range tables {
