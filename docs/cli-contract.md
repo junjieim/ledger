@@ -35,6 +35,7 @@ Write the full embedding configuration to the local database.
 **Output (--json):**
 ```json
 {
+  "api_key": "abc******xyz",
   "model_name": "embedding-3",
   "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
   "dimensions": 2048,
@@ -42,23 +43,14 @@ Write the full embedding configuration to the local database.
 }
 ```
 
-### `ledger config update`
-
-Update one or more embedding config fields in the local database.
-
-**At least one required:**
-- `--api-key STRING`
-- `--model-name STRING`
-- `--model-url STRING`
-- `--dimensions INT`
-
 ### `ledger config show`
 
-Show non-secret embedding config fields only.
+Show embedding configuration. The API key is masked.
 
 **Output (--json):**
 ```json
 {
+  "api_key": "abc******xyz",
   "model_name": "embedding-3",
   "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
   "dimensions": 2048,
@@ -187,7 +179,7 @@ Hybrid search (keyword + semantic vector).
 
 Notes:
 - Semantic and hybrid semantic paths read embedding settings from the DB-backed `ledger config`.
-- If embedding is not configured, `--mode semantic` fails fast.
+- If embedding is not configured, `--mode semantic` returns an empty result and emits a warning.
 - If embedding is not configured and both `--keyword` and `--semantic` are passed in hybrid mode, the CLI returns keyword results only and emits a warning.
 
 **Output:**

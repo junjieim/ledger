@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ledger-ai/ledger/internal/embedding"
+	"github.com/ledger-ai/ledger/internal/model"
 	"github.com/ledger-ai/ledger/internal/repo"
 	"github.com/ledger-ai/ledger/internal/search"
 	"github.com/spf13/cobra"
@@ -42,7 +43,8 @@ func newSearchCmd() *cobra.Command {
 						semantic = ""
 						effectiveMode = "keyword"
 					} else {
-						return fmt.Errorf("embedding is not configured; run ledger config set or ledger config update")
+						fmt.Fprintf(cmd.ErrOrStderr(), "Warning: embedding is not configured, so semantic search returned no vector results.\n")
+						return outputSearchResult(&model.SearchResult{Items: []model.SearchItem{}})
 					}
 				}
 			}
@@ -69,19 +71,7 @@ func newSearchCmd() *cobra.Command {
 				return err
 			}
 
-			if jsonOut {
-				outputJSON(result)
-				return nil
-			}
-
-			outputText("%-36s  %7s  %-8s  %10s  %-5s  %-8s  %-10s  %s\n",
-				"ID", "SCORE", "MATCH", "AMOUNT", "CUR", "CATEGORY", "DATE", "DESCRIPTION")
-			outputText("%s\n", strings.Repeat("-", 120))
-			for _, item := range result.Items {
-				outputText("%-36s  %7.4f  %-8s  %10.2f  %-5s  %-8s  %-10s  %s\n",
-					item.ID, item.Score, item.MatchType, item.Amount, item.Currency, item.Category, item.OccurredAt, item.Description)
-			}
-			return nil
+			return outputSearchResult(result)
 		},
 	}
 
@@ -91,4 +81,20 @@ func newSearchCmd() *cobra.Command {
 	cmd.Flags().IntVar(&limit, "limit", 10, "max results")
 
 	return cmd
+}
+
+func outputSearchResult(result *model.SearchResult) error {
+	if jsonOut {
+		outputJSON(result)
+		return nil
+	}
+
+	outputText("%-36s  %7s  %-8s  %10s  %-5s  %-8s  %-10s  %s\n",
+		"ID", "SCORE", "MATCH", "AMOUNT", "CUR", "CATEGORY", "DATE", "DESCRIPTION")
+	outputText("%s\n", strings.Repeat("-", 120))
+	for _, item := range result.Items {
+		outputText("%-36s  %7.4f  %-8s  %10.2f  %-5s  %-8s  %-10s  %s\n",
+			item.ID, item.Score, item.MatchType, item.Amount, item.Currency, item.Category, item.OccurredAt, item.Description)
+	}
+	return nil
 }

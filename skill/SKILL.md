@@ -15,7 +15,7 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 - The binary is available at `script/ledger` inside the packaged skill directory.
 - The working database path is usually `./data/ledger.db`.
 - Run `ledger init` once before first use.
-- Semantic search requires embedding to be configured through `ledger config set` or `ledger config update`.
+- Semantic search requires embedding to be configured through `ledger config set`.
 - If no embedding API key is configured, the CLI emits a warning on every command run; this is non-blocking unless a semantic-search path is actually used.
 
 ## Operating Rules
@@ -113,8 +113,7 @@ script/ledger --db ./data/ledger.db audit --limit 20 --json
 - "标签" => `tag`
 - "审计" / "历史操作" => `audit`
 
-## Safety Notes
-- `search --semantic` fails fast if embedding has not been configured through `ledger config set` or `ledger config update`.
+- `search --semantic` returns an empty result and warning if embedding has not been configured through `ledger config set`.
 - Hybrid search with both `--keyword` and `--semantic` degrades to keyword-only when embedding is not configured, and emits a warning explaining that semantic results are omitted.
 - The CLI also emits a non-blocking warning on each non-config command run when embedding is not configured.
 - `category remove --force` detaches referenced transactions and child categories first.

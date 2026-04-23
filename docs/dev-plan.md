@@ -41,7 +41,7 @@ Tasks:
 
 Implementation note:
 - Current Phase 2 uses persisted embeddings + Go-side cosine ranking as the stable baseline.
-- Embedding runtime settings now live in a DB-backed `embedding_config` table and are managed through `ledger config set / update / show`.
+- Embedding runtime settings now live in a DB-backed `embedding_config` table and are managed through `ledger config set / show`.
 - `sqlite-vec` integration is deferred until the runtime compatibility issue is resolved cleanly.
 
 ## Phase 3: Complete Features

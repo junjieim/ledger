@@ -77,7 +77,7 @@ func warnIfEmbeddingAPIKeyMissing(cmd *cobra.Command) {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "Warning: embedding is not configured. Run ledger config set or ledger config update before using semantic search.\n")
+	fmt.Fprintf(os.Stderr, "Warning: embedding is not configured. Run ledger config set before using semantic search.\n")
 }
 
 func isConfigCommand(cmd *cobra.Command) bool {
