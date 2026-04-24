@@ -243,6 +243,10 @@ type UpdateTransactionInput struct {
 	Date        *string
 	Description *string
 	Note        *string
+	Tags        *[]string
+	AddTags     []string
+	RemoveTags  []string
+	ClearTags   bool
 }
 
 func UpdateTransaction(db *sql.DB, in UpdateTransactionInput) (*model.Transaction, error) {
@@ -278,13 +282,10 @@ func UpdateTransaction(db *sql.DB, in UpdateTransactionInput) (*model.Transactio
 		args = append(args, *in.Note)
 	}
 
-	if len(sets) == 0 {
+	tagMutation := in.Tags != nil || len(in.AddTags) > 0 || len(in.RemoveTags) > 0 || in.ClearTags
+	if len(sets) == 0 && !tagMutation {
 		return nil, fmt.Errorf("no fields to update")
 	}
-
-	sets = append(sets, "updated_at = ?")
-	args = append(args, time.Now().UTC().Format(time.RFC3339))
-	args = append(args, in.ID)
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -292,14 +293,50 @@ func UpdateTransaction(db *sql.DB, in UpdateTransactionInput) (*model.Transactio
 	}
 	defer tx.Rollback()
 
-	query := fmt.Sprintf("UPDATE transactions SET %s WHERE id = ?", strings.Join(sets, ", "))
-	res, err := tx.Exec(query, args...)
-	if err != nil {
-		return nil, err
+	if len(sets) > 0 {
+		sets = append(sets, "updated_at = ?")
+		args = append(args, time.Now().UTC().Format(time.RFC3339))
+		args = append(args, in.ID)
+
+		query := fmt.Sprintf("UPDATE transactions SET %s WHERE id = ?", strings.Join(sets, ", "))
+		res, err := tx.Exec(query, args...)
+		if err != nil {
+			return nil, err
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			return nil, fmt.Errorf("transaction not found: %s", in.ID)
+		}
+	} else {
+		var exists int
+		if err := tx.QueryRow("SELECT 1 FROM transactions WHERE id = ?", in.ID).Scan(&exists); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("transaction not found: %s", in.ID)
+			}
+			return nil, err
+		}
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return nil, fmt.Errorf("transaction not found: %s", in.ID)
+
+	if in.Tags != nil {
+		if err := replaceTransactionTags(tx, in.ID, *in.Tags); err != nil {
+			return nil, err
+		}
+	} else {
+		if in.ClearTags {
+			if err := clearTransactionTags(tx, in.ID); err != nil {
+				return nil, err
+			}
+		}
+		if len(in.AddTags) > 0 {
+			if err := addTransactionTags(tx, in.ID, in.AddTags); err != nil {
+				return nil, err
+			}
+		}
+		if len(in.RemoveTags) > 0 {
+			if err := removeTransactionTags(tx, in.ID, in.RemoveTags); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if err := logAudit(tx, "update_transaction", "transaction", in.ID, in); err != nil {
@@ -309,6 +346,61 @@ func UpdateTransaction(db *sql.DB, in UpdateTransactionInput) (*model.Transactio
 		return nil, err
 	}
 	return GetTransaction(db, in.ID)
+}
+
+func replaceTransactionTags(tx *sql.Tx, transactionID string, tags []string) error {
+	if err := clearTransactionTags(tx, transactionID); err != nil {
+		return err
+	}
+	return addTransactionTags(tx, transactionID, tags)
+}
+
+func clearTransactionTags(tx *sql.Tx, transactionID string) error {
+	_, err := tx.Exec("DELETE FROM transaction_tags WHERE transaction_id = ?", transactionID)
+	return err
+}
+
+func addTransactionTags(tx *sql.Tx, transactionID string, tags []string) error {
+	for _, tagName := range normalizedTags(tags) {
+		tagID, err := ensureTag(tx, tagName)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)", transactionID, tagID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeTransactionTags(tx *sql.Tx, transactionID string, tags []string) error {
+	for _, tagName := range normalizedTags(tags) {
+		if _, err := tx.Exec(`
+			DELETE FROM transaction_tags
+			WHERE transaction_id = ?
+			  AND tag_id IN (SELECT id FROM tags WHERE name = ?)
+		`, transactionID, tagName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizedTags(tags []string) []string {
+	seen := make(map[string]struct{}, len(tags))
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		name := strings.TrimSpace(tag)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
 }
 
 type QueryInput struct {

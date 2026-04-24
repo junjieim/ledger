@@ -17,6 +17,10 @@ func newUpdateCmd() *cobra.Command {
 		date        string
 		description string
 		note        string
+		tags        []string
+		addTags     []string
+		removeTags  []string
+		clearTags   bool
 	)
 
 	cmd := &cobra.Command{
@@ -25,6 +29,12 @@ func newUpdateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == "" {
 				return fmt.Errorf("--id is required")
+			}
+			if cmd.Flags().Changed("tag") && (cmd.Flags().Changed("add-tag") || cmd.Flags().Changed("remove-tag") || clearTags) {
+				return fmt.Errorf("--tag cannot be combined with --add-tag, --remove-tag, or --clear-tags")
+			}
+			if clearTags && (cmd.Flags().Changed("add-tag") || cmd.Flags().Changed("remove-tag")) {
+				return fmt.Errorf("--clear-tags cannot be combined with --add-tag or --remove-tag")
 			}
 
 			in := repo.UpdateTransactionInput{ID: id}
@@ -65,6 +75,22 @@ func newUpdateCmd() *cobra.Command {
 				in.Note = &note
 				changed = true
 			}
+			if cmd.Flags().Changed("tag") {
+				in.Tags = &tags
+				changed = true
+			}
+			if cmd.Flags().Changed("add-tag") {
+				in.AddTags = addTags
+				changed = true
+			}
+			if cmd.Flags().Changed("remove-tag") {
+				in.RemoveTags = removeTags
+				changed = true
+			}
+			if clearTags {
+				in.ClearTags = true
+				changed = true
+			}
 
 			if !changed {
 				return fmt.Errorf("at least one field must be specified to update")
@@ -92,6 +118,10 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&date, "date", "", "new date")
 	cmd.Flags().StringVar(&description, "description", "", "new description")
 	cmd.Flags().StringVar(&note, "note", "", "new note")
+	cmd.Flags().StringArrayVar(&tags, "tag", nil, "replace tags with provided names (repeatable)")
+	cmd.Flags().StringArrayVar(&addTags, "add-tag", nil, "add tags without replacing existing ones (repeatable)")
+	cmd.Flags().StringArrayVar(&removeTags, "remove-tag", nil, "remove tags by name (repeatable)")
+	cmd.Flags().BoolVar(&clearTags, "clear-tags", false, "remove all tags")
 
 	cmd.MarkFlagRequired("id")
 	return cmd

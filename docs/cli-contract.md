@@ -121,6 +121,10 @@ Update a transaction.
 - `--date STRING`
 - `--description STRING`
 - `--note STRING`
+- `--tag STRING` — Replace tags with the provided full set, repeatable
+- `--add-tag STRING` — Add tags without replacing existing ones, repeatable
+- `--remove-tag STRING` — Remove tags by name, repeatable
+- `--clear-tags` — Remove all tags
 
 **Output:** Updated full transaction record (same format as `add`)
 

@@ -349,6 +349,29 @@ func TestManagementCommandsAndRegressionFlows(t *testing.T) {
 	if _, _, err := runLedgerCommand(t, dbPath, "--json", "update", "--id", txID, "--amount", "1300", "--description", "机票改签"); err != nil {
 		t.Fatalf("update command: %v", err)
 	}
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "update",
+		"--id", txID,
+		"--category", "餐饮",
+		"--tag", "工作餐",
+		"--tag", "出差",
+	)
+	if err != nil {
+		t.Fatalf("update command category/tags: %v", err)
+	}
+	if !strings.Contains(stdout, "\"category\": \"餐饮\"") || !strings.Contains(stdout, "\"工作餐\"") || !strings.Contains(stdout, "\"出差\"") {
+		t.Fatalf("unexpected category/tag update output: %q", stdout)
+	}
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "update",
+		"--id", txID,
+		"--add-tag", "高铁",
+		"--remove-tag", "出差",
+	)
+	if err != nil {
+		t.Fatalf("update command add/remove tags: %v", err)
+	}
+	if !strings.Contains(stdout, "\"高铁\"") || strings.Contains(stdout, "\"出差\"") {
+		t.Fatalf("unexpected incremental tag update output: %q", stdout)
+	}
 
 	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "balance", "--currency", "CNY")
 	if err != nil {

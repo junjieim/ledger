@@ -105,6 +105,17 @@ script/ledger --db ./data/ledger.db query \
   --json
 ```
 
+### Update Existing Transactions
+```bash
+script/ledger --db ./data/ledger.db update \
+  --id <TRANSACTION_ID> \
+  --category 交通 \
+  --add-tag 高铁 \
+  --add-tag 广州 \
+  --remove-tag 临时标签 \
+  --json
+```
+
 ### Search
 Keyword only:
 ```bash

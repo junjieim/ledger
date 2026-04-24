@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	ledgerdb "github.com/ledger-ai/ledger/internal/db"
@@ -77,11 +78,17 @@ func TestTransactionLifecycleAndBalance(t *testing.T) {
 	newAmount := 30.0
 	newDescription := "午餐牛肉面加饮料"
 	newDate := "2026-04-24"
+	transportID, err := ResolveCategoryID(db, "交通")
+	if err != nil {
+		t.Fatalf("resolve category 交通: %v", err)
+	}
 	updated, err := UpdateTransaction(db, UpdateTransactionInput{
 		ID:          added.ID,
 		Amount:      &newAmount,
+		CategoryID:  transportID,
 		Description: &newDescription,
 		Date:        &newDate,
+		Tags:        &[]string{"通勤", "工作日"},
 	})
 	if err != nil {
 		t.Fatalf("update transaction: %v", err)
@@ -91,6 +98,37 @@ func TestTransactionLifecycleAndBalance(t *testing.T) {
 	}
 	if updated.Description == nil || *updated.Description != newDescription {
 		t.Fatalf("unexpected updated description: %#v", updated.Description)
+	}
+	if updated.Category != "交通" {
+		t.Fatalf("expected updated category 交通, got %q", updated.Category)
+	}
+	slices.Sort(updated.Tags)
+	if len(updated.Tags) != 2 || updated.Tags[0] != "工作日" || updated.Tags[1] != "通勤" {
+		t.Fatalf("unexpected replaced tags: %#v", updated.Tags)
+	}
+
+	updated, err = UpdateTransaction(db, UpdateTransactionInput{
+		ID:         added.ID,
+		AddTags:    []string{"高铁"},
+		RemoveTags: []string{"通勤"},
+	})
+	if err != nil {
+		t.Fatalf("update transaction tags incrementally: %v", err)
+	}
+	slices.Sort(updated.Tags)
+	if len(updated.Tags) != 2 || updated.Tags[0] != "工作日" || updated.Tags[1] != "高铁" {
+		t.Fatalf("unexpected incrementally updated tags: %#v", updated.Tags)
+	}
+
+	updated, err = UpdateTransaction(db, UpdateTransactionInput{
+		ID:        added.ID,
+		ClearTags: true,
+	})
+	if err != nil {
+		t.Fatalf("clear transaction tags: %v", err)
+	}
+	if len(updated.Tags) != 0 {
+		t.Fatalf("expected tags to be cleared, got %#v", updated.Tags)
 	}
 
 	balance, err := GetBalance(db, "CNY")
