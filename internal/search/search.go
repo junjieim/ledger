@@ -20,10 +20,11 @@ import (
 const rrfK = 60.0
 
 type Input struct {
-	Keyword  string
-	Semantic string
-	Mode     string
-	Limit    int
+	Keyword   string
+	Semantic  string
+	Mode      string
+	Limit     int
+	Threshold float64
 }
 
 type indexedDocument struct {
@@ -42,10 +43,6 @@ func Transactions(db *sql.DB, in Input, embedder *embedding.Client) (*model.Sear
 	if err != nil {
 		return nil, err
 	}
-	if in.Limit <= 0 {
-		in.Limit = 10
-	}
-
 	docs, docMap, err := loadDocuments(db)
 	if err != nil {
 		return nil, err
@@ -78,7 +75,7 @@ func Transactions(db *sql.DB, in Input, embedder *embedding.Client) (*model.Sear
 
 	var semanticMatches []scoredMatch
 	if mode == "semantic" || (mode == "hybrid" && strings.TrimSpace(in.Semantic) != "") {
-		semanticMatches, err = semanticSearch(context.Background(), db, strings.TrimSpace(in.Semantic), in.Limit, embedder)
+		semanticMatches, err = semanticSearch(context.Background(), db, strings.TrimSpace(in.Semantic), in.Limit, in.Threshold, embedder)
 		if err != nil {
 			return nil, err
 		}
@@ -313,13 +310,23 @@ func keywordSearch(db *sql.DB, keyword string, limit int) ([]scoredMatch, error)
 		return nil, nil
 	}
 
-	rows, err := db.Query(`
-		SELECT transaction_id, bm25(transactions_search) AS rank
-		FROM transactions_search
-		WHERE transactions_search MATCH ?
-		ORDER BY rank
-		LIMIT ?
-	`, query, limit)
+	var rows *sql.Rows
+	if limit > 0 {
+		rows, err = db.Query(`
+			SELECT transaction_id, bm25(transactions_search) AS rank
+			FROM transactions_search
+			WHERE transactions_search MATCH ?
+			ORDER BY rank
+			LIMIT ?
+		`, query, limit)
+	} else {
+		rows, err = db.Query(`
+			SELECT transaction_id, bm25(transactions_search) AS rank
+			FROM transactions_search
+			WHERE transactions_search MATCH ?
+			ORDER BY rank
+		`, query)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("keyword search: %w", err)
 	}
@@ -443,7 +450,7 @@ func syncEmbeddings(ctx context.Context, db *sql.DB, docs []indexedDocument, emb
 	return tx.Commit()
 }
 
-func semanticSearch(ctx context.Context, db *sql.DB, query string, limit int, embedder *embedding.Client) ([]scoredMatch, error) {
+func semanticSearch(ctx context.Context, db *sql.DB, query string, limit int, threshold float64, embedder *embedding.Client) ([]scoredMatch, error) {
 	if strings.TrimSpace(query) == "" {
 		return nil, nil
 	}
@@ -486,7 +493,16 @@ func semanticSearch(ctx context.Context, db *sql.DB, query string, limit int, em
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].Score > matches[j].Score
 	})
-	if len(matches) > limit {
+	if threshold > 0 {
+		filtered := matches[:0]
+		for _, m := range matches {
+			if m.Score >= threshold {
+				filtered = append(filtered, m)
+			}
+		}
+		matches = filtered
+	}
+	if limit > 0 && len(matches) > limit {
 		matches = matches[:limit]
 	}
 	return matches, nil
@@ -507,7 +523,7 @@ func hybridize(keywordMatches, semanticMatches []scoredMatch, limit int) []score
 	}
 
 	sortMatches(results)
-	if len(results) > limit {
+	if limit > 0 && len(results) > limit {
 		results = results[:limit]
 	}
 	return results

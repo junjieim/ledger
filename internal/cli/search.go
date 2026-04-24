@@ -13,10 +13,11 @@ import (
 
 func newSearchCmd() *cobra.Command {
 	var (
-		keyword  string
-		semantic string
-		mode     string
-		limit    int
+		keyword   string
+		semantic  string
+		mode      string
+		limit     int
+		threshold float64
 	)
 
 	cmd := &cobra.Command{
@@ -62,10 +63,11 @@ func newSearchCmd() *cobra.Command {
 			}
 
 			result, err := search.Transactions(database, search.Input{
-				Keyword:  keyword,
-				Semantic: semantic,
-				Mode:     effectiveMode,
-				Limit:    limit,
+				Keyword:   keyword,
+				Semantic:  semantic,
+				Mode:      effectiveMode,
+				Limit:     limit,
+				Threshold: threshold,
 			}, embedder)
 			if err != nil {
 				return err
@@ -78,7 +80,8 @@ func newSearchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&keyword, "keyword", "", "keyword query")
 	cmd.Flags().StringVar(&semantic, "semantic", "", "semantic query")
 	cmd.Flags().StringVar(&mode, "mode", "hybrid", "keyword, semantic, or hybrid")
-	cmd.Flags().IntVar(&limit, "limit", 10, "max results")
+	cmd.Flags().IntVar(&limit, "limit", 0, "max results (0 = unlimited)")
+	cmd.Flags().Float64Var(&threshold, "threshold", 0.5, "minimum score for semantic results")
 
 	return cmd
 }
