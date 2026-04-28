@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	ledgerdb "github.com/ledger-ai/ledger/internal/db"
+	"github.com/ledger-ai/ledger/internal/model"
 )
 
 func newTestDB(t *testing.T) *sql.DB {
@@ -24,6 +27,190 @@ func newTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("init test db: %v", err)
 	}
 	return db
+}
+
+func addRefundTestExpense(t *testing.T, db *sql.DB, amount float64, note *string) *model.Transaction {
+	t.Helper()
+
+	categoryID, err := ResolveCategoryID(db, "餐饮")
+	if err != nil {
+		t.Fatalf("resolve category: %v", err)
+	}
+	desc := "测试火锅"
+	tx, err := AddTransaction(db, AddTransactionInput{
+		Direction:   "expense",
+		Amount:      amount,
+		Currency:    "CNY",
+		CategoryID:  categoryID,
+		Description: &desc,
+		Note:        note,
+		OccurredAt:  "2026-04-23",
+	})
+	if err != nil {
+		t.Fatalf("add expense: %v", err)
+	}
+	return tx
+}
+
+func TestRefundPartialAndBalanceUsesNetAmount(t *testing.T) {
+	db := newTestDB(t)
+	added := addRefundTestExpense(t, db, 100, nil)
+
+	refunded, err := Refund(db, added.ID, 25, "店家漏单")
+	if err != nil {
+		t.Fatalf("refund partial: %v", err)
+	}
+	if refunded.RefundAmount != 25 || refunded.NetAmount != 75 {
+		t.Fatalf("unexpected refund amounts: refund=%v net=%v", refunded.RefundAmount, refunded.NetAmount)
+	}
+	if refunded.Note == nil || *refunded.Note != "[退款 25 CNY] 店家漏单" {
+		t.Fatalf("unexpected refund note: %#v", refunded.Note)
+	}
+
+	balance, err := GetBalance(db, "CNY")
+	if err != nil {
+		t.Fatalf("balance: %v", err)
+	}
+	if len(balance.Balances) != 1 || balance.Balances[0].Balance != -75 {
+		t.Fatalf("expected net balance -75, got %#v", balance.Balances)
+	}
+}
+
+func TestRefundOmitAmountRefundsRemaining(t *testing.T) {
+	db := newTestDB(t)
+	added := addRefundTestExpense(t, db, 100, nil)
+
+	if _, err := Refund(db, added.ID, 25, "第一次"); err != nil {
+		t.Fatalf("first refund: %v", err)
+	}
+	refunded, err := Refund(db, added.ID, 0, "剩余退款")
+	if err != nil {
+		t.Fatalf("refund remaining: %v", err)
+	}
+	if refunded.RefundAmount != 100 || refunded.NetAmount != 0 {
+		t.Fatalf("unexpected full refund amounts: refund=%v net=%v", refunded.RefundAmount, refunded.NetAmount)
+	}
+	if refunded.Note == nil || !strings.Contains(*refunded.Note, "[退款 75 CNY] 剩余退款") {
+		t.Fatalf("expected remaining refund note, got %#v", refunded.Note)
+	}
+}
+
+func TestRefundCumulativeAndOverAmountRejected(t *testing.T) {
+	db := newTestDB(t)
+	added := addRefundTestExpense(t, db, 100, nil)
+
+	if _, err := Refund(db, added.ID, 25, "第一次"); err != nil {
+		t.Fatalf("first refund: %v", err)
+	}
+	if _, err := Refund(db, added.ID, 30, "第二次"); err != nil {
+		t.Fatalf("second refund: %v", err)
+	}
+	if _, err := Refund(db, added.ID, 50, "超额"); err == nil {
+		t.Fatal("expected over refund to fail")
+	}
+
+	reloaded, err := GetTransaction(db, added.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if reloaded.RefundAmount != 55 || reloaded.NetAmount != 45 {
+		t.Fatalf("unexpected persisted refund after failed over-refund: refund=%v net=%v", reloaded.RefundAmount, reloaded.NetAmount)
+	}
+}
+
+func TestRefundRejectsIncomeTransferAndFullyRefundedRows(t *testing.T) {
+	db := newTestDB(t)
+
+	income, err := AddTransaction(db, AddTransactionInput{
+		Direction:  "income",
+		Amount:     100,
+		Currency:   "CNY",
+		OccurredAt: "2026-04-23",
+	})
+	if err != nil {
+		t.Fatalf("add income: %v", err)
+	}
+	if _, err := Refund(db, income.ID, 10, "income"); err == nil {
+		t.Fatal("expected refund on income to fail")
+	}
+
+	transfer, err := CreateTransfer(db, TransferInput{
+		FromCurrency: "USD",
+		ToCurrency:   "CNY",
+		FromAmount:   100,
+		ToAmount:     720,
+		OccurredAt:   "2026-04-23",
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := Refund(db, transfer.Expense.ID, 10, "transfer"); err == nil {
+		t.Fatal("expected refund on transfer leg to fail")
+	}
+
+	expense := addRefundTestExpense(t, db, 100, nil)
+	if _, err := Refund(db, expense.ID, 0, "full"); err != nil {
+		t.Fatalf("full refund: %v", err)
+	}
+	if _, err := Refund(db, expense.ID, 1, "again"); err == nil {
+		t.Fatal("expected refund on fully refunded transaction to fail")
+	}
+}
+
+func TestRefundAppendsNoteAndWritesAuditLog(t *testing.T) {
+	db := newTestDB(t)
+	note := "公司附近"
+	added := addRefundTestExpense(t, db, 100, &note)
+
+	refunded, err := Refund(db, added.ID, 25, "")
+	if err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+	if refunded.Note == nil || *refunded.Note != "公司附近\n[退款 25 CNY]" {
+		t.Fatalf("unexpected appended note: %#v", refunded.Note)
+	}
+
+	entries, err := QueryAuditLog(db, "refund_transaction", "", "", 10)
+	if err != nil {
+		t.Fatalf("query audit: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 refund audit entry, got %d", len(entries))
+	}
+}
+
+func TestQueryTransactionsIncludesRefundAmounts(t *testing.T) {
+	db := newTestDB(t)
+	added := addRefundTestExpense(t, db, 100, nil)
+	if _, err := Refund(db, added.ID, 25, "partial"); err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+
+	result, err := QueryTransactions(db, QueryInput{Limit: 10})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if result.Total != 1 || len(result.Items) != 1 {
+		t.Fatalf("unexpected query result: %+v", result)
+	}
+	if result.Items[0].RefundAmount != 25 || result.Items[0].NetAmount != 75 {
+		t.Fatalf("unexpected query refund fields: %+v", result.Items[0])
+	}
+}
+
+func TestRefundUpdatesUpdatedAt(t *testing.T) {
+	db := newTestDB(t)
+	added := addRefundTestExpense(t, db, 100, nil)
+	originalUpdatedAt := added.UpdatedAt
+
+	time.Sleep(1100 * time.Millisecond)
+	refunded, err := Refund(db, added.ID, 25, "partial")
+	if err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+	if !refunded.UpdatedAt.After(originalUpdatedAt) {
+		t.Fatalf("expected updated_at to advance, original=%s refunded=%s", originalUpdatedAt, refunded.UpdatedAt)
+	}
 }
 
 func TestTransactionLifecycleAndBalance(t *testing.T) {

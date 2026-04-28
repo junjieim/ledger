@@ -7,6 +7,7 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 
 ## When To Use
 - Record income, expenses, and currency transfers through shell commands.
+- Record full or partial refunds against existing expenses.
 - Query balances, transactions, categories, tags, or audit history.
 - Search ledger records by keyword.
 - Package bookkeeping actions as deterministic tool calls instead of free-form text.
@@ -30,6 +31,7 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 - Prefer `--json` whenever another agent or program will parse the result.
 - Do not guess destructive operations. Confirm before `delete`, `category remove`, or `tag remove`.
 - For transfers, always use `ledger transfer`; do not manually create the two legs with `ledger add`.
+- For refunds, always use `ledger refund`; do not manually add an income row.
 
 ## Core Workflow
 1. Ensure the database exists: `script/ledger --db ./data/ledger.db init`
@@ -114,6 +116,17 @@ script/ledger --db ./data/ledger.db update \
   --json
 ```
 
+### Refund An Existing Expense
+Omit `--amount` to refund the remaining balance. Refunds accumulate on the original expense and cannot exceed the original amount.
+
+```bash
+script/ledger --db ./data/ledger.db refund \
+  --id <ORIG_TRANSACTION_ID> \
+  --amount 25 \
+  --note "店家漏单退回" \
+  --json
+```
+
 ### Search
 ```bash
 script/ledger --db ./data/ledger.db search \
@@ -148,11 +161,13 @@ script/ledger --db ./data/ledger.db audit --limit 20 --json
 - "查一下" / "show me" => `query`
 - "搜一下" / "find similar" => `search`
 - "换汇" / "transfer between currencies" => `transfer`
+- "退款" / "退一笔" / "refund" => `refund`
 - "分类" => `category`
 - "标签" => `tag`
 - "审计" / "历史操作" => `audit`
 
 ## Safety Notes
 - Richer, more structured `add` commands improve later query and search quality.
+- `refund` accumulates on the original expense; refunding more than the original amount is rejected.
 - `category remove --force` detaches referenced transactions and child categories first.
 - `delete` removes both legs of a transfer automatically when the target transaction belongs to a transfer group.

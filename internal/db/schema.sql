@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id              TEXT PRIMARY KEY,
   direction       TEXT NOT NULL CHECK(direction IN ('income', 'expense')),
   amount          REAL NOT NULL CHECK(amount > 0),
+  refund_amount   REAL NOT NULL DEFAULT 0 CHECK(refund_amount >= 0 AND refund_amount <= amount),
   currency        TEXT NOT NULL DEFAULT 'CNY' CHECK(currency GLOB '[A-Z][A-Z][A-Z]'),
   transfer_group  TEXT,
   category_id     TEXT,

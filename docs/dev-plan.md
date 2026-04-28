@@ -79,3 +79,11 @@ Tasks:
 
 - Investigate a clean path back to stable in-DB vector search on top of the current SQLite driver stack.
 - Add unit tests and baseline regression coverage for the Ledger CLI and repo layers.
+- Consider restoring per-refund event granularity if audit_log is not enough for family use after real refund workflows.
+
+## Phase 5: Refund Handling (2026-04-28)
+
+- Single-column net model: `transactions.refund_amount`.
+- `ledger refund` subcommand accumulates full or partial refunds onto existing expense rows.
+- Balance uses net expense amount: `amount - refund_amount`.
+- Transaction and query JSON expose `refund_amount` and `net_amount`.

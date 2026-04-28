@@ -6,6 +6,8 @@ type Transaction struct {
 	ID            string    `json:"id"`
 	Direction     string    `json:"direction"`
 	Amount        float64   `json:"amount"`
+	RefundAmount  float64   `json:"refund_amount"`
+	NetAmount     float64   `json:"net_amount"`
 	Currency      string    `json:"currency"`
 	TransferGroup *string   `json:"transfer_group,omitempty"`
 	CategoryID    *string   `json:"category_id,omitempty"`

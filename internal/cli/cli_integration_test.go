@@ -137,6 +137,227 @@ func TestSearchSemanticFlagRemoved(t *testing.T) {
 	}
 }
 
+func TestRefundCLIPartialAndBalanceUsesNetAmount(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "ledger.db")
+	if _, _, err := runLedgerCommand(t, dbPath, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	stdout, _, err := runLedgerCommand(t, dbPath, "--json", "add",
+		"--amount", "100",
+		"--direction", "expense",
+		"--currency", "CNY",
+		"--category", "餐饮",
+		"--description", "测试火锅",
+	)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	var added struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &added); err != nil {
+		t.Fatalf("decode add: %v", err)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "refund",
+		"--id", added.ID,
+		"--amount", "25",
+		"--note", "店家漏单",
+	)
+	if err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+	var refunded struct {
+		RefundAmount float64 `json:"refund_amount"`
+		NetAmount    float64 `json:"net_amount"`
+		Note         string  `json:"note"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &refunded); err != nil {
+		t.Fatalf("decode refund: %v", err)
+	}
+	if refunded.RefundAmount != 25 || refunded.NetAmount != 75 {
+		t.Fatalf("unexpected refund fields: %+v", refunded)
+	}
+	if !strings.Contains(refunded.Note, "[退款 25 CNY] 店家漏单") {
+		t.Fatalf("expected refund note, got %q", refunded.Note)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "balance", "--currency", "CNY")
+	if err != nil {
+		t.Fatalf("balance: %v", err)
+	}
+	var balance struct {
+		Balances []struct {
+			Currency string  `json:"currency"`
+			Balance  float64 `json:"balance"`
+		} `json:"balances"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &balance); err != nil {
+		t.Fatalf("decode balance: %v", err)
+	}
+	if len(balance.Balances) != 1 || balance.Balances[0].Balance != -75 {
+		t.Fatalf("expected CNY balance -75, got %+v", balance.Balances)
+	}
+}
+
+func TestRefundCLIOmitAmountRefundsRemaining(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "ledger.db")
+	if _, _, err := runLedgerCommand(t, dbPath, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	stdout, _, err := runLedgerCommand(t, dbPath, "--json", "add",
+		"--amount", "100",
+		"--direction", "expense",
+		"--category", "餐饮",
+	)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	var added struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &added); err != nil {
+		t.Fatalf("decode add: %v", err)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "refund", "--id", added.ID)
+	if err != nil {
+		t.Fatalf("refund remaining: %v", err)
+	}
+	var refunded struct {
+		RefundAmount float64 `json:"refund_amount"`
+		NetAmount    float64 `json:"net_amount"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &refunded); err != nil {
+		t.Fatalf("decode refund: %v", err)
+	}
+	if refunded.RefundAmount != 100 || refunded.NetAmount != 0 {
+		t.Fatalf("unexpected full refund fields: %+v", refunded)
+	}
+}
+
+func TestRefundCLIValidation(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "ledger.db")
+	if _, _, err := runLedgerCommand(t, dbPath, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	if _, stderr, err := runLedgerCommand(t, dbPath, "refund", "--amount", "25"); err == nil {
+		t.Fatal("expected missing id to fail")
+	} else if !strings.Contains(stderr, "--id required") {
+		t.Fatalf("expected --id required, got %q", stderr)
+	}
+
+	stdout, _, err := runLedgerCommand(t, dbPath, "--json", "add",
+		"--amount", "100",
+		"--direction", "expense",
+		"--category", "餐饮",
+	)
+	if err != nil {
+		t.Fatalf("add expense: %v", err)
+	}
+	var added struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &added); err != nil {
+		t.Fatalf("decode add: %v", err)
+	}
+	if _, _, err := runLedgerCommand(t, dbPath, "--json", "refund", "--id", added.ID, "--amount", "75"); err != nil {
+		t.Fatalf("first refund: %v", err)
+	}
+	if _, stderr, err := runLedgerCommand(t, dbPath, "--json", "refund", "--id", added.ID, "--amount", "30"); err == nil {
+		t.Fatal("expected over refund to fail")
+	} else if !strings.Contains(stderr, "refund exceeds remaining") {
+		t.Fatalf("expected over refund error, got %q", stderr)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "add",
+		"--amount", "100",
+		"--direction", "income",
+	)
+	if err != nil {
+		t.Fatalf("add income: %v", err)
+	}
+	var income struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &income); err != nil {
+		t.Fatalf("decode income: %v", err)
+	}
+	if _, stderr, err := runLedgerCommand(t, dbPath, "--json", "refund", "--id", income.ID, "--amount", "1"); err == nil {
+		t.Fatal("expected income refund to fail")
+	} else if !strings.Contains(stderr, "cannot refund non-expense transaction") {
+		t.Fatalf("expected income refund error, got %q", stderr)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "transfer",
+		"--from-currency", "USD",
+		"--to-currency", "CNY",
+		"--from-amount", "100",
+		"--to-amount", "720",
+	)
+	if err != nil {
+		t.Fatalf("transfer: %v", err)
+	}
+	var transfer struct {
+		Expense struct {
+			ID string `json:"id"`
+		} `json:"expense"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &transfer); err != nil {
+		t.Fatalf("decode transfer: %v", err)
+	}
+	if _, stderr, err := runLedgerCommand(t, dbPath, "--json", "refund", "--id", transfer.Expense.ID, "--amount", "1"); err == nil {
+		t.Fatal("expected transfer refund to fail")
+	} else if !strings.Contains(stderr, "cannot refund transfer leg") {
+		t.Fatalf("expected transfer refund error, got %q", stderr)
+	}
+}
+
+func TestQueryJSONIncludesRefundFields(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "ledger.db")
+	if _, _, err := runLedgerCommand(t, dbPath, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	stdout, _, err := runLedgerCommand(t, dbPath, "--json", "add",
+		"--amount", "100",
+		"--direction", "expense",
+		"--category", "餐饮",
+	)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	var added struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &added); err != nil {
+		t.Fatalf("decode add: %v", err)
+	}
+	if _, _, err := runLedgerCommand(t, dbPath, "--json", "refund", "--id", added.ID, "--amount", "25"); err != nil {
+		t.Fatalf("refund: %v", err)
+	}
+
+	stdout, _, err = runLedgerCommand(t, dbPath, "--json", "query")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	var queried struct {
+		Items []struct {
+			RefundAmount float64 `json:"refund_amount"`
+			NetAmount    float64 `json:"net_amount"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &queried); err != nil {
+		t.Fatalf("decode query: %v", err)
+	}
+	if len(queried.Items) != 1 || queried.Items[0].RefundAmount != 25 || queried.Items[0].NetAmount != 75 {
+		t.Fatalf("unexpected query refund fields: %+v", queried.Items)
+	}
+}
+
 func TestManagementCommandsAndRegressionFlows(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "ledger.db")
 

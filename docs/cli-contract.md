@@ -2,6 +2,9 @@
 
 All commands accept structured parameters only. Natural language understanding is the external AI agent's responsibility.
 
+Notes:
+- Refunds use `transactions.refund_amount` on the original expense row. Databases can be dropped and recreated; no legacy compatibility is maintained.
+
 ## Global Options
 
 ```
@@ -45,6 +48,8 @@ Add a transaction.
   "id": "uuid",
   "direction": "expense",
   "amount": 15.0,
+  "refund_amount": 0,
+  "net_amount": 15.0,
   "currency": "CNY",
   "category": "餐饮",
   "description": "午餐，牛肉面",
@@ -92,6 +97,40 @@ Update a transaction.
 
 ---
 
+### `ledger refund`
+
+Record a full or partial refund against an existing expense. This updates the original expense row instead of creating a separate refund row.
+
+**Required:**
+- `--id STRING` — Original expense transaction UUID
+
+**Optional:**
+- `--amount FLOAT` — Refund amount to add. Omit or pass `0` to refund the remaining amount.
+- `--note STRING` — Refund note. Appended to the transaction note as `[退款 N CCY] <note>`.
+
+Rules:
+- Only `expense` transactions can be refunded.
+- Transfer legs cannot be refunded.
+- Cumulative refunds cannot exceed the original amount.
+- Refunds affect balance through net expense: `amount - refund_amount`.
+
+**Output (--json):**
+```json
+{
+  "id": "uuid",
+  "direction": "expense",
+  "amount": 100.0,
+  "refund_amount": 25.0,
+  "net_amount": 75.0,
+  "currency": "CNY",
+  "category": "购物",
+  "note": "[退款 25 CNY] 退货",
+  "occurred_at": "2026-04-22"
+}
+```
+
+---
+
 ### `ledger query`
 
 Query transactions by filters. No params returns latest 50.
@@ -118,6 +157,8 @@ Query transactions by filters. No params returns latest 50.
       "id": "uuid",
       "direction": "expense",
       "amount": 15.0,
+      "refund_amount": 0,
+      "net_amount": 15.0,
       "currency": "CNY",
       "category": "餐饮",
       "description": "午餐，牛肉面",
@@ -168,7 +209,7 @@ Notes:
 
 ### `ledger balance`
 
-Balance per currency (sum of income - sum of expense).
+Balance per currency. Expense rows use net amount (`amount - refund_amount`), so refunds reduce spending without being counted as ordinary income.
 
 **Optional:**
 - `--currency STRING` — Filter to one currency (default all)

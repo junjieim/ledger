@@ -48,6 +48,7 @@ func NewRootCmd() *cobra.Command {
 		newSearchCmd(),
 		newBalanceCmd(),
 		newTransferCmd(),
+		newRefundCmd(),
 		newCategoryCmd(),
 		newTagCmd(),
 		newAuditCmd(),

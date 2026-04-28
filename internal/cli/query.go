@@ -64,17 +64,21 @@ func newQueryCmd() *cobra.Command {
 				outputJSON(result)
 			} else {
 				outputText("Total: %d\n", result.Total)
-				outputText("%-36s  %-8s  %10s  %-5s  %-8s  %-10s  %s\n",
-					"ID", "DIR", "AMOUNT", "CUR", "CATEGORY", "DATE", "DESCRIPTION")
-				outputText("%s\n", strings.Repeat("-", 100))
+				outputText("%-36s  %-8s  %10s  %10s  %-5s  %-8s  %-10s  %s\n",
+					"ID", "DIR", "AMOUNT", "NET", "CUR", "CATEGORY", "DATE", "DESCRIPTION")
+				outputText("%s\n", strings.Repeat("-", 112))
 				for _, t := range result.Items {
 					desc := ""
 					if t.Description != nil {
 						desc = *t.Description
 					}
 					cat := t.Category
-					outputText("%-36s  %-8s  %10.2f  %-5s  %-8s  %-10s  %s\n",
-						t.ID, t.Direction, t.Amount, t.Currency, cat, t.OccurredAt, desc)
+					net := ""
+					if t.RefundAmount > 0 {
+						net = fmt.Sprintf("%.2f", t.NetAmount)
+					}
+					outputText("%-36s  %-8s  %10.2f  %10s  %-5s  %-8s  %-10s  %s\n",
+						t.ID, t.Direction, t.Amount, net, t.Currency, cat, t.OccurredAt, desc)
 				}
 			}
 			return nil

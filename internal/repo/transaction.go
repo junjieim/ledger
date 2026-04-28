@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -160,13 +161,13 @@ func GetTransaction(db *sql.DB, id string) (*model.Transaction, error) {
 	var createdAt model.SQLiteTime
 	var updatedAt model.SQLiteTime
 	err := db.QueryRow(
-		`SELECT t.id, t.direction, t.amount, t.currency, t.transfer_group,
+		`SELECT t.id, t.direction, t.amount, t.refund_amount, t.currency, t.transfer_group,
 		        t.category_id, c.name, t.description, t.raw_input, t.note,
 		        t.occurred_at, t.created_at, t.updated_at
 		 FROM transactions t
 		 LEFT JOIN categories c ON t.category_id = c.id
 		 WHERE t.id = ?`, id,
-	).Scan(&t.ID, &t.Direction, &t.Amount, &t.Currency, &t.TransferGroup,
+	).Scan(&t.ID, &t.Direction, &t.Amount, &t.RefundAmount, &t.Currency, &t.TransferGroup,
 		&t.CategoryID, &catName, &t.Description, &t.RawInput, &t.Note,
 		&t.OccurredAt, &createdAt, &updatedAt)
 	if err != nil {
@@ -174,6 +175,7 @@ func GetTransaction(db *sql.DB, id string) (*model.Transaction, error) {
 	}
 	t.CreatedAt = createdAt.Time
 	t.UpdatedAt = updatedAt.Time
+	t.NetAmount = t.Amount - t.RefundAmount
 	if catName.Valid {
 		t.Category = catName.String
 	}
@@ -195,6 +197,87 @@ func GetTransaction(db *sql.DB, id string) (*model.Transaction, error) {
 		t.Tags = append(t.Tags, name)
 	}
 	return t, rows.Err()
+}
+
+func Refund(db *sql.DB, id string, increment float64, userNote string) (*model.Transaction, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var (
+		direction     string
+		amount        float64
+		refundAmount  float64
+		currency      string
+		transferGroup sql.NullString
+		note          sql.NullString
+	)
+	err = tx.QueryRow(`
+		SELECT direction, amount, refund_amount, currency, transfer_group, note
+		FROM transactions
+		WHERE id = ?
+	`, id).Scan(&direction, &amount, &refundAmount, &currency, &transferGroup, &note)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("transaction not found: %s", id)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if direction != "expense" {
+		return nil, fmt.Errorf("cannot refund non-expense transaction")
+	}
+	if transferGroup.Valid {
+		return nil, fmt.Errorf("cannot refund transfer leg")
+	}
+	if refundAmount >= amount {
+		return nil, fmt.Errorf("transaction already fully refunded")
+	}
+
+	remaining := amount - refundAmount
+	if increment <= 0 {
+		increment = remaining
+	}
+	if refundAmount+increment > amount {
+		return nil, fmt.Errorf("refund exceeds remaining: requested %s, remaining %s", formatRefundAmount(increment), formatRefundAmount(remaining))
+	}
+
+	marker := fmt.Sprintf("[退款 %s %s]", formatRefundAmount(increment), currency)
+	if strings.TrimSpace(userNote) != "" {
+		marker += " " + strings.TrimSpace(userNote)
+	}
+	newNote := marker
+	if note.Valid && strings.TrimSpace(note.String) != "" {
+		newNote = note.String + "\n" + marker
+	}
+	newRefundAmount := refundAmount + increment
+
+	if _, err := tx.Exec(`
+		UPDATE transactions
+		SET refund_amount = ?, note = ?, updated_at = ?
+		WHERE id = ?
+	`, newRefundAmount, newNote, time.Now().UTC().Format(time.RFC3339), id); err != nil {
+		return nil, err
+	}
+
+	detail := map[string]interface{}{
+		"increment":     increment,
+		"refund_amount": newRefundAmount,
+		"net_amount":    amount - newRefundAmount,
+		"user_note":     userNote,
+	}
+	if err := logAudit(tx, "refund_transaction", "transaction", id, detail); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return GetTransaction(db, id)
+}
+
+func formatRefundAmount(amount float64) string {
+	return strconv.FormatFloat(amount, 'f', -1, 64)
 }
 
 func DeleteTransaction(db *sql.DB, id string) error {
@@ -471,7 +554,7 @@ func QueryTransactions(db *sql.DB, in QueryInput) (*model.QueryResult, error) {
 
 	// Fetch items
 	selectQuery := fmt.Sprintf(
-		`SELECT t.id, t.direction, t.amount, t.currency, t.transfer_group,
+		`SELECT t.id, t.direction, t.amount, t.refund_amount, t.currency, t.transfer_group,
 		        t.category_id, c.name, t.description, t.raw_input, t.note,
 		        t.occurred_at, t.created_at, t.updated_at
 		 FROM transactions t
@@ -494,13 +577,14 @@ func QueryTransactions(db *sql.DB, in QueryInput) (*model.QueryResult, error) {
 		var catName sql.NullString
 		var createdAt model.SQLiteTime
 		var updatedAt model.SQLiteTime
-		if err := rows.Scan(&t.ID, &t.Direction, &t.Amount, &t.Currency, &t.TransferGroup,
+		if err := rows.Scan(&t.ID, &t.Direction, &t.Amount, &t.RefundAmount, &t.Currency, &t.TransferGroup,
 			&t.CategoryID, &catName, &t.Description, &t.RawInput, &t.Note,
 			&t.OccurredAt, &createdAt, &updatedAt); err != nil {
 			return nil, err
 		}
 		t.CreatedAt = createdAt.Time
 		t.UpdatedAt = updatedAt.Time
+		t.NetAmount = t.Amount - t.RefundAmount
 		if catName.Valid {
 			t.Category = catName.String
 		}
@@ -534,7 +618,7 @@ func QueryTransactions(db *sql.DB, in QueryInput) (*model.QueryResult, error) {
 }
 
 func GetBalance(db *sql.DB, currency string) (*model.BalanceResult, error) {
-	query := `SELECT currency, SUM(CASE direction WHEN 'income' THEN amount ELSE -amount END) AS balance
+	query := `SELECT currency, SUM(CASE direction WHEN 'income' THEN amount ELSE -(amount - refund_amount) END) AS balance
 	          FROM transactions`
 	args := []interface{}{}
 	if currency != "" {

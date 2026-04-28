@@ -28,6 +28,8 @@ CREATE TABLE transactions (
   id              TEXT PRIMARY KEY,           -- UUID
   direction       TEXT NOT NULL CHECK(direction IN ('income', 'expense')),
   amount          REAL NOT NULL CHECK(amount > 0),     -- 实际金额（如 15.5）
+  refund_amount   REAL NOT NULL DEFAULT 0
+                  CHECK(refund_amount >= 0 AND refund_amount <= amount), -- 已退款金额
   currency        TEXT NOT NULL DEFAULT 'CNY'
                   CHECK(currency GLOB '[A-Z][A-Z][A-Z]'),  -- ISO 4217
   transfer_group  TEXT,              -- 非 NULL 时表示这是 transfer 的一半
@@ -104,6 +106,6 @@ INSERT INTO categories (id, name, direction) VALUES
 -- 常用查询：按币种统计余额
 -- -------------------------------------------
 -- SELECT currency,
---        SUM(CASE direction WHEN 'income' THEN amount ELSE -amount END) AS balance
+--        SUM(CASE direction WHEN 'income' THEN amount ELSE -(amount - refund_amount) END) AS balance
 -- FROM transactions
 -- GROUP BY currency;

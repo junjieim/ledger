@@ -62,6 +62,12 @@ internal/search + tokenizer — Search pipeline
 - The keyword index is synchronized from current transaction text and removes stale entries for deleted transactions.
 - Semantic, hybrid, and embedding-backed search paths were rolled back; current search is keyword-only.
 
+## Refund Handling
+
+- Refunds use a single-column net model for family bookkeeping: `transactions.refund_amount` stores the cumulative refunded amount on the original expense row.
+- No separate refund transaction row is created. Transaction JSON exposes both `refund_amount` and derived `net_amount = amount - refund_amount`.
+- Balance calculations subtract expense net amount, so refunded expenses reduce spending without inflating ordinary income.
+
 ## Key Design Decisions
 
 1. **CLI, not MCP** — Simple, cross-platform, any agent that can execute shell commands can use it
