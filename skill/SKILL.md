@@ -5,6 +5,17 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 
 # Ledger Skill
 
+## Source And Updates
+- GitHub repository: `https://github.com/junjieim/ledger`
+- Use the repository's releases page to find the latest packaged skill for this machine's OS and CPU architecture.
+- When updating an existing local Ledger skill, preserve the local `data/` directory. It contains the user's Ledger database.
+- Do not replace the whole installed skill directory with a destructive copy such as `rsync --delete` from an archive root.
+- Safe update workflow:
+  1. Download and extract the matching release package.
+  2. Copy only `SKILL.md`, `example/`, and `script/ledger` into the installed skill directory.
+  3. Keep the installed `data/` directory and existing `data/ledger.db*` files unchanged.
+  4. Run `script/ledger --db ./data/ledger.db init` only if the database does not already exist.
+
 ## When To Use
 - Record income, expenses, and currency transfers through shell commands.
 - Record full or partial refunds against existing expenses.
