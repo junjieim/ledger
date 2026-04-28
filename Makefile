@@ -4,8 +4,7 @@ BUILD_DIR := $(DIST_DIR)/build
 SKILL_DIST_DIR := $(DIST_DIR)/skill/$(APP)
 PACKAGE_DIR := $(DIST_DIR)/package
 RELEASE_DIR := $(DIST_DIR)/release
-CODEX_HOME ?= $(HOME)/.codex
-CODEX_SKILL_DIR := $(CODEX_HOME)/skills/$(APP)
+SKILL_INSTALL_DIR ?= $(HOME)/.claude/skills/$(APP)
 MAIN_PKG := ./cmd/ledger
 GO ?= go
 LDFLAGS := -s -w
@@ -67,11 +66,11 @@ verify-release-package: release-package
 	done
 
 skill-install-local: skill-package
-	rm -rf $(CODEX_SKILL_DIR)
-	@mkdir -p $(CODEX_SKILL_DIR)/script $(CODEX_SKILL_DIR)/example
-	cp $(SKILL_DIST_DIR)/SKILL.md $(CODEX_SKILL_DIR)/SKILL.md
-	rsync -a --delete $(SKILL_DIST_DIR)/example/ $(CODEX_SKILL_DIR)/example/
-	cp $(SKILL_DIST_DIR)/script/$(APP) $(CODEX_SKILL_DIR)/script/$(APP)
+	rm -rf "$(SKILL_INSTALL_DIR)"
+	@mkdir -p "$(SKILL_INSTALL_DIR)/script" "$(SKILL_INSTALL_DIR)/example"
+	cp $(SKILL_DIST_DIR)/SKILL.md "$(SKILL_INSTALL_DIR)/SKILL.md"
+	rsync -a --delete $(SKILL_DIST_DIR)/example/ "$(SKILL_INSTALL_DIR)/example/"
+	cp $(SKILL_DIST_DIR)/script/$(APP) "$(SKILL_INSTALL_DIR)/script/$(APP)"
 
 clean:
 	rm -rf $(DIST_DIR)
