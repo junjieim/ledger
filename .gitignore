@@ -33,9 +33,10 @@ vendor/
 Thumbs.db
 
 # Data (runtime generated)
-data/*.db
-data/*.db-wal
-data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+.ledger/
 
 # Build / packaging output
 dist/

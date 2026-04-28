@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db search \
+script/ledger search \
   --keyword 聚餐 \
   --json
 ```

@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db update \
+script/ledger update \
   --id <TRANSACTION_ID> \
   --amount 35 \
   --note "加了饮料" \
@@ -17,7 +17,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db update \
+script/ledger update \
   --id <TRANSACTION_ID> \
   --category 交通 \
   --tag 广州 \

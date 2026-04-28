@@ -48,7 +48,9 @@ Ledger release packages contain:
 - `script/ledger`: the CLI binary
 - `SKILL.md`: the agent operating guide
 - `example/`: command examples
-- `data/`: the runtime database directory
+
+The default database lives at `~/.ledger/ledger.db`, outside the skill
+directory, so the skill can be updated by replacing the installed skill package.
 
 ## More
 

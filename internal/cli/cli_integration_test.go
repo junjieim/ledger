@@ -58,6 +58,29 @@ func runLedgerCommand(t *testing.T, dbPath string, args ...string) (string, stri
 	return stdout.String(), stderr.String(), runErr
 }
 
+func TestDefaultDBPathUsesHomeLedgerDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	want := filepath.Join(home, ".ledger", "ledger.db")
+	if got := defaultDBPath(); got != want {
+		t.Fatalf("default db path = %q, want %q", got, want)
+	}
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"init"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("init with default db path: %v", err)
+	}
+	if database != nil {
+		_ = database.Close()
+		database = nil
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("expected default db to be created at %q: %v", want, err)
+	}
+}
+
 func TestSearchKeywordIntegration(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "ledger.db")
 

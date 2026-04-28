@@ -8,7 +8,7 @@ Notes:
 ## Global Options
 
 ```
---db PATH       Database path (default ./data/ledger.db)
+--db PATH       Database path (default ~/.ledger/ledger.db)
 --json          Output JSON format (default human-readable table)
 ```
 

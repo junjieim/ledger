@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db delete \
+script/ledger delete \
   --id <TRANSACTION_ID> \
   --json
 ```

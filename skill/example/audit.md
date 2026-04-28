@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db audit \
+script/ledger audit \
   --limit 10 \
   --json
 ```

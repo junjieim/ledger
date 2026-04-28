@@ -6,13 +6,13 @@ User intent:
 Suggested commands:
 ```bash
 # First, find the original transaction id.
-script/ledger --db ./data/ledger.db query \
+script/ledger query \
   --category 购物 \
   --limit 5 \
   --json
 
 # Then refund 25 against it.
-script/ledger --db ./data/ledger.db refund \
+script/ledger refund \
   --id <ORIG_TRANSACTION_ID> \
   --amount 25 \
   --note "退货" \

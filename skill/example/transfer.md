@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db transfer \
+script/ledger transfer \
   --from-currency USD \
   --to-currency CNY \
   --from-amount 100 \

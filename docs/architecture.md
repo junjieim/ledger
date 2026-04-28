@@ -36,8 +36,7 @@ ledger/
 ledger/
 ├── SKILL.md                     # AI reads this to understand how to use the CLI
 ├── example/                     # Usage examples
-├── script/ledger                # Compiled single binary
-└── data/ledger.db               # Created at runtime
+└── script/ledger                # Compiled single binary
 ```
 
 ## Layered Design
@@ -77,4 +76,4 @@ internal/search + tokenizer — Search pipeline
 5. **go:embed for schema** — Auto-initialize DB on first run
 6. **Repo layer handles audit** — All write operations automatically log to audit_log
 7. **--json output** — Default human-readable, --json for agent parsing
-8. **DB path** — Default `./data/ledger.db`, overridable via `--db` or env var
+8. **DB path** — Default `~/.ledger/ledger.db`, overridable via `--db`

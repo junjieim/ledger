@@ -5,5 +5,5 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db balance --json
+script/ledger balance --json
 ```

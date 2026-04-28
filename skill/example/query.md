@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db query \
+script/ledger query \
   --month 2026-04 \
   --category 餐饮 \
   --direction expense \

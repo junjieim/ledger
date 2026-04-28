@@ -5,7 +5,7 @@ User intent:
 
 Suggested command:
 ```bash
-script/ledger --db ./data/ledger.db add \
+script/ledger add \
   --amount 150 \
   --direction expense \
   --currency CNY \

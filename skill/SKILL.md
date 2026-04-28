@@ -8,13 +8,9 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 ## Source And Updates
 - GitHub repository: `https://github.com/junjieim/ledger`
 - Use the repository's releases page to find the latest packaged skill for this machine's OS and CPU architecture.
-- When updating an existing local Ledger skill, preserve the local `data/` directory. It contains the user's Ledger database.
-- Do not replace the whole installed skill directory with a destructive copy such as `rsync --delete` from an archive root.
-- Safe update workflow:
-  1. Download and extract the matching release package.
-  2. Copy only `SKILL.md`, `example/`, and `script/ledger` into the installed skill directory.
-  3. Keep the installed `data/` directory and existing `data/ledger.db*` files unchanged.
-  4. Run `script/ledger --db ./data/ledger.db init` only if the database does not already exist.
+- The Ledger database lives outside the skill directory at `~/.ledger/ledger.db`.
+- Updating the skill is safe to do by replacing the entire installed `ledger` skill directory with the extracted release package.
+- After install or update, run `script/ledger init` once to ensure the database schema exists.
 
 ## When To Use
 - Record income, expenses, and currency transfers through shell commands.
@@ -25,8 +21,8 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 
 ## Preconditions
 - The binary is available at `script/ledger` inside the packaged skill directory.
-- The working database path is usually `./data/ledger.db`.
-- Run `ledger init` once before first use.
+- The default database path is `~/.ledger/ledger.db`.
+- Run `script/ledger init` once before first use.
 
 ## Operating Rules
 - Do natural-language understanding outside the CLI.
@@ -45,10 +41,10 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 - For refunds, always use `ledger refund`; do not manually add an income row.
 
 ## Core Workflow
-1. Ensure the database exists: `script/ledger --db ./data/ledger.db init`
+1. Ensure the database exists: `script/ledger init`
 2. Before `add`, check existing categories and tags first when classification or tagging is not obvious:
-   `script/ledger --db ./data/ledger.db category list --json`
-   `script/ledger --db ./data/ledger.db tag list --json`
+   `script/ledger category list --json`
+   `script/ledger tag list --json`
 3. Convert the request into one CLI command.
 4. Execute the command with `--json` when downstream parsing matters.
 5. Summarize the result for the user in natural language.
@@ -69,7 +65,7 @@ Example interpretation:
 - Good `add` command:
 
 ```bash
-script/ledger --db ./data/ledger.db add \
+script/ledger add \
   --amount 150 \
   --direction expense \
   --currency CNY \
@@ -88,12 +84,12 @@ Prefer the fullest deterministic command you can infer.
 When useful, inspect existing categories/tags before writing:
 
 ```bash
-script/ledger --db ./data/ledger.db category list --json
-script/ledger --db ./data/ledger.db tag list --json
+script/ledger category list --json
+script/ledger tag list --json
 ```
 
 ```bash
-script/ledger --db ./data/ledger.db add \
+script/ledger add \
   --amount 28.5 \
   --direction expense \
   --currency CNY \
@@ -109,7 +105,7 @@ script/ledger --db ./data/ledger.db add \
 
 ### Query Transactions
 ```bash
-script/ledger --db ./data/ledger.db query \
+script/ledger query \
   --month 2026-04 \
   --category 餐饮 \
   --limit 20 \
@@ -118,7 +114,7 @@ script/ledger --db ./data/ledger.db query \
 
 ### Update Existing Transactions
 ```bash
-script/ledger --db ./data/ledger.db update \
+script/ledger update \
   --id <TRANSACTION_ID> \
   --category 交通 \
   --add-tag 高铁 \
@@ -131,7 +127,7 @@ script/ledger --db ./data/ledger.db update \
 Omit `--amount` to refund the remaining balance. Refunds accumulate on the original expense and cannot exceed the original amount.
 
 ```bash
-script/ledger --db ./data/ledger.db refund \
+script/ledger refund \
   --id <ORIG_TRANSACTION_ID> \
   --amount 25 \
   --note "店家漏单退回" \
@@ -140,14 +136,14 @@ script/ledger --db ./data/ledger.db refund \
 
 ### Search
 ```bash
-script/ledger --db ./data/ledger.db search \
+script/ledger search \
   --keyword 火锅 \
   --json
 ```
 
 ### Transfer
 ```bash
-script/ledger --db ./data/ledger.db transfer \
+script/ledger transfer \
   --from-currency USD \
   --to-currency CNY \
   --from-amount 100 \
@@ -158,13 +154,13 @@ script/ledger --db ./data/ledger.db transfer \
 
 ### Category And Tag Management
 ```bash
-script/ledger --db ./data/ledger.db category add --name 差旅 --direction expense --json
-script/ledger --db ./data/ledger.db tag add --name 报销 --json
+script/ledger category add --name 差旅 --direction expense --json
+script/ledger tag add --name 报销 --json
 ```
 
 ### Audit
 ```bash
-script/ledger --db ./data/ledger.db audit --limit 20 --json
+script/ledger audit --limit 20 --json
 ```
 
 ## Mapping Hints

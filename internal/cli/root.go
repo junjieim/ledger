@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ledger-ai/ledger/internal/db"
 	"github.com/spf13/cobra"
@@ -15,6 +16,14 @@ var (
 	jsonOut  bool
 	database *sql.DB
 )
+
+func defaultDBPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(".ledger", "ledger.db")
+	}
+	return filepath.Join(home, ".ledger", "ledger.db")
+}
 
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
@@ -36,7 +45,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&dbPath, "db", "./data/ledger.db", "database path")
+	root.PersistentFlags().StringVar(&dbPath, "db", defaultDBPath(), "database path")
 	root.PersistentFlags().BoolVar(&jsonOut, "json", false, "output JSON format")
 
 	root.AddCommand(

@@ -28,11 +28,10 @@ build-cross:
 
 skill-package: build
 	@rm -rf $(SKILL_DIST_DIR)
-	@mkdir -p $(SKILL_DIST_DIR)/script $(SKILL_DIST_DIR)/example $(SKILL_DIST_DIR)/data
+	@mkdir -p $(SKILL_DIST_DIR)/script $(SKILL_DIST_DIR)/example
 	cp skill/SKILL.md $(SKILL_DIST_DIR)/SKILL.md
 	cp -R skill/example/. $(SKILL_DIST_DIR)/example/
 	cp $(BUILD_DIR)/$(APP) $(SKILL_DIST_DIR)/script/$(APP)
-	touch $(SKILL_DIST_DIR)/data/.gitkeep
 
 skill-package-cross: build-cross
 	@rm -rf $(PACKAGE_DIR) $(RELEASE_DIR)
@@ -44,11 +43,10 @@ skill-package-cross: build-cross
 		pkg="$$staging/$(APP)"; \
 		echo "packaging $(APP)-$$os-$$arch"; \
 		rm -rf "$$staging"; \
-		mkdir -p "$$pkg/script" "$$pkg/example" "$$pkg/data"; \
+		mkdir -p "$$pkg/script" "$$pkg/example"; \
 		cp skill/SKILL.md "$$pkg/SKILL.md"; \
 		cp -R skill/example/. "$$pkg/example/"; \
 		cp "$(BUILD_DIR)/$(APP)-$$os-$$arch" "$$pkg/script/$(APP)"; \
-		touch "$$pkg/data/.gitkeep"; \
 		tar -czf "$(RELEASE_DIR)/$(APP)-$$os-$$arch.tar.gz" -C "$$staging" "$(APP)"; \
 	done
 
@@ -59,7 +57,6 @@ verify-package: skill-package
 	test -f $(SKILL_DIST_DIR)/SKILL.md
 	test -f $(SKILL_DIST_DIR)/script/$(APP)
 	test -d $(SKILL_DIST_DIR)/example
-	test -d $(SKILL_DIST_DIR)/data
 
 verify-release-package: release-package
 	test -f $(RELEASE_DIR)/checksums.txt
@@ -70,11 +67,11 @@ verify-release-package: release-package
 	done
 
 skill-install-local: skill-package
-	@mkdir -p $(CODEX_SKILL_DIR) $(CODEX_SKILL_DIR)/script $(CODEX_SKILL_DIR)/example $(CODEX_SKILL_DIR)/data
+	rm -rf $(CODEX_SKILL_DIR)
+	@mkdir -p $(CODEX_SKILL_DIR)/script $(CODEX_SKILL_DIR)/example
 	cp $(SKILL_DIST_DIR)/SKILL.md $(CODEX_SKILL_DIR)/SKILL.md
 	rsync -a --delete $(SKILL_DIST_DIR)/example/ $(CODEX_SKILL_DIR)/example/
 	cp $(SKILL_DIST_DIR)/script/$(APP) $(CODEX_SKILL_DIR)/script/$(APP)
-	touch $(CODEX_SKILL_DIR)/data/.gitkeep
 
 clean:
 	rm -rf $(DIST_DIR)
