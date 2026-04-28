@@ -25,14 +25,6 @@ func TestInitFreshResetsSchemaAndSeedsDefaults(t *testing.T) {
 		t.Fatal("expected seeded categories")
 	}
 
-	var modelName string
-	if err := db.QueryRow(`SELECT model_name FROM embedding_config WHERE id = 1`).Scan(&modelName); err != nil {
-		t.Fatalf("load embedding config: %v", err)
-	}
-	if modelName == "" {
-		t.Fatal("expected seeded embedding config")
-	}
-
 	if _, err := db.Exec(`INSERT INTO transactions (id, direction, amount, currency, occurred_at) VALUES ('tx-1', 'expense', 10, 'CNY', '2026-04-23')`); err != nil {
 		t.Fatalf("insert transaction: %v", err)
 	}

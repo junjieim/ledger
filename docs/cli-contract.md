@@ -22,44 +22,6 @@ ledger init --force       # Recreate database (destructive)
 
 ---
 
-### `ledger config set`
-
-Write the full embedding configuration to the local database.
-
-**Required:**
-- `--api-key STRING`
-- `--model-name STRING`
-- `--model-url STRING`
-- `--dimensions INT`
-
-**Output (--json):**
-```json
-{
-  "api_key": "abc******xyz",
-  "model_name": "embedding-3",
-  "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
-  "dimensions": 2048,
-  "updated_at": "2026-04-23T10:00:00Z"
-}
-```
-
-### `ledger config show`
-
-Show embedding configuration. The API key is masked.
-
-**Output (--json):**
-```json
-{
-  "api_key": "abc******xyz",
-  "model_name": "embedding-3",
-  "model_url": "https://open.bigmodel.cn/api/paas/v4/embeddings",
-  "dimensions": 2048,
-  "updated_at": "2026-04-23T10:00:00Z"
-}
-```
-
----
-
 ### `ledger add`
 
 Add a transaction.
@@ -171,20 +133,18 @@ Query transactions by filters. No params returns latest 50.
 
 ### `ledger search`
 
-Hybrid search (keyword + semantic vector).
+Keyword search.
 
-**At least one required:**
+**Required:**
 - `--keyword STRING` — Keyword search (FTS5)
-- `--semantic STRING` — Semantic search (embedding + vec)
 
 **Optional:**
-- `--mode STRING` — `keyword` | `semantic` | `hybrid` (default `hybrid`)
-- `--limit INT` — Max results (default 10)
+- `--limit INT` — Max results (`0` = unlimited)
 
 Notes:
-- Semantic and hybrid semantic paths read embedding settings from the DB-backed `ledger config`.
-- If embedding is not configured, `--mode semantic` returns an empty result and emits a warning.
-- If embedding is not configured and both `--keyword` and `--semantic` are passed in hybrid mode, the CLI returns keyword results only and emits a warning.
+- `ledger config` has been removed.
+- `--semantic`, `--mode`, and `--threshold` have been removed.
+- Search JSON output no longer contains `match_type`.
 
 **Output:**
 ```json
@@ -193,7 +153,6 @@ Notes:
     {
       "id": "uuid",
       "score": 0.92,
-      "match_type": "hybrid",
       "direction": "expense",
       "amount": 200.0,
       "currency": "CNY",

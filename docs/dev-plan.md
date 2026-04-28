@@ -5,7 +5,7 @@
 | Phase | Goal | Deliverable |
 |-------|------|-------------|
 | **Phase 1** | Skeleton + basic CRUD | Working CLI: init, add, delete, update, query, balance |
-| **Phase 2** | Search capability | Hybrid search: FTS5 keyword + persisted embeddings semantic |
+| **Phase 2** | Search capability | FTS5 keyword search with gse pre-tokenization |
 | **Phase 3** | Complete features | transfer, category mgmt, tag mgmt, audit log |
 | **Phase 4** | Skill packaging | SKILL.md, examples, Makefile, cross-compile |
 
@@ -26,23 +26,19 @@ Tasks:
 
 ## Phase 2: Search
 
-**Goal:** `ledger search --keyword "火锅" --semantic "和朋友聚餐"` returns relevant results
+**Goal:** `ledger search --keyword "火锅"` returns relevant records
 
 Tasks:
 1. `internal/tokenizer/gse.go` — gse Chinese tokenization
 2. `internal/search` — FTS5 keyword search (pre-tokenized input)
-3. `internal/embedding/client.go` — embedding API client
-4. `internal/search` — Persist embeddings and compute cosine similarity
-5. `internal/search` — Score fusion / hybrid ranking
-6. `internal/cli/search.go` — search command
-7. Tests
+3. `internal/cli/search.go` — search command
+4. Tests
 
-**Deliverable:** Hybrid Chinese search working end-to-end.
+**Deliverable:** Chinese keyword search working end-to-end.
 
 Implementation note:
-- Current Phase 2 uses persisted embeddings + Go-side cosine ranking as the stable baseline.
-- Embedding runtime settings now live in a DB-backed `embedding_config` table and are managed through `ledger config set / show`.
-- `sqlite-vec` integration is deferred until the runtime compatibility issue is resolved cleanly.
+- Current Phase 2 uses FTS5 with gse-pre-tokenized transaction text and query text.
+- Semantic / hybrid / embedding search was rolled back on 2026-04-27.
 
 ## Phase 3: Complete Features
 

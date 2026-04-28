@@ -64,28 +64,6 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_target  ON audit_log(target_type, targe
 CREATE INDEX IF NOT EXISTS idx_audit_log_agent   ON audit_log(agent_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 
-CREATE TABLE IF NOT EXISTS embedding_config (
-  id          INTEGER PRIMARY KEY CHECK (id = 1),
-  api_key     TEXT,
-  model_name  TEXT NOT NULL,
-  model_url   TEXT NOT NULL,
-  dimensions  INTEGER NOT NULL,
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS transaction_embeddings (
-  transaction_id    TEXT PRIMARY KEY,
-  source_hash       TEXT NOT NULL,
-  config_signature  TEXT NOT NULL,
-  dimensions        INTEGER NOT NULL,
-  embedding_json    TEXT NOT NULL,
-  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
-);
-
-INSERT OR IGNORE INTO embedding_config (id, api_key, model_name, model_url, dimensions) VALUES
-  (1, '', 'embedding-3', 'https://open.bigmodel.cn/api/paas/v4/embeddings', 2048);
-
 -- Seed default categories (ignore if already exist)
 INSERT OR IGNORE INTO categories (id, name, direction) VALUES
   ('cat-food',       '餐饮', 'expense'),

@@ -6,10 +6,8 @@
 |-----------|--------|-----------|
 | Language | Go (pure Go, no CGO) | Single binary distribution |
 | SQLite | modernc.org/sqlite | Pure-Go SQLite driver, no CGO dependency |
-| Vector Search | Persisted embeddings + Go cosine similarity | Stable Phase 2 baseline; sqlite-vec integration deferred after runtime compatibility issues |
 | CLI Framework | cobra | Industry standard |
 | Chinese Tokenization | gse | Pure Go, github.com/go-ego/gse |
-| Embedding | Zhipu embedding-3 | 2048 dimensions, HTTP API |
 
 ## Source Code Structure
 
@@ -20,8 +18,7 @@ ledger/
 │   ├── db/                      # Connection management, schema (go:embed)
 │   ├── model/                   # Data structures
 │   ├── repo/                    # CRUD + audit logging
-│   ├── search/                  # FTS5 + semantic hybrid search
-│   ├── embedding/               # Zhipu API client
+│   ├── search/                  # FTS5 keyword search
 │   ├── tokenizer/               # gse tokenization
 │   └── cli/                     # Cobra subcommands
 ├── skill/
@@ -56,16 +53,14 @@ internal/repo — Business logic, CRUD, automatic audit logging
     ↓
 internal/db — SQLite connection + transactions
     ↓
-internal/search + embedding + tokenizer — Search pipeline
+internal/search + tokenizer — Search pipeline
 ```
 
 ## Current Search Implementation
 
 - Keyword search uses a dedicated FTS5 table rebuilt from gse-tokenized transaction text.
-- Semantic search stores embedding runtime settings in a DB-backed `embedding_config` table, persists vectors in SQLite as JSON, and computes cosine similarity in Go.
-- The embedding cache is keyed by both document hash and embedding config signature (model name, URL, dimensions), so dimension or model changes trigger a clean re-embed path.
-- Hybrid search uses reciprocal-rank fusion over keyword and semantic result lists.
-- `sqlite-vec` is intentionally deferred for now because the current in-DB vector-search integrations we evaluated are not yet stable enough for this project.
+- The keyword index is synchronized from current transaction text and removes stale entries for deleted transactions.
+- Semantic, hybrid, and embedding-backed search paths were rolled back; current search is keyword-only.
 
 ## Key Design Decisions
 

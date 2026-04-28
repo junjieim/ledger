@@ -8,15 +8,13 @@ description: "Use this skill to operate the Ledger CLI for structured personal b
 ## When To Use
 - Record income, expenses, and currency transfers through shell commands.
 - Query balances, transactions, categories, tags, or audit history.
-- Search ledger records by keyword or semantic intent.
+- Search ledger records by keyword.
 - Package bookkeeping actions as deterministic tool calls instead of free-form text.
 
 ## Preconditions
 - The binary is available at `script/ledger` inside the packaged skill directory.
 - The working database path is usually `./data/ledger.db`.
 - Run `ledger init` once before first use.
-- Semantic search requires embedding to be configured through `ledger config set`.
-- If embedding configuration is incomplete, the CLI emits a warning on every non-config command run so the agent or user can fill the missing embedding fields.
 
 ## Operating Rules
 - Do natural-language understanding outside the CLI.
@@ -117,29 +115,9 @@ script/ledger --db ./data/ledger.db update \
 ```
 
 ### Search
-Keyword only:
 ```bash
 script/ledger --db ./data/ledger.db search \
   --keyword 火锅 \
-  --json
-```
-
-Hybrid:
-```bash
-script/ledger --db ./data/ledger.db search \
-  --keyword 聚餐 \
-  --semantic "和同事吃饭" \
-  --mode hybrid \
-  --json
-```
-
-### Configure Embeddings
-```bash
-script/ledger --db ./data/ledger.db config set \
-  --api-key "<your-embedding-api-key>" \
-  --model-name embedding-3 \
-  --model-url https://open.bigmodel.cn/api/paas/v4/embeddings \
-  --dimensions 2048 \
   --json
 ```
 
@@ -176,8 +154,5 @@ script/ledger --db ./data/ledger.db audit --limit 20 --json
 
 ## Safety Notes
 - Richer, more structured `add` commands improve later query and search quality.
-- `search --semantic` returns an empty result and warning if embedding has not been configured through `ledger config set`.
-- Hybrid search with both `--keyword` and `--semantic` degrades to keyword-only when embedding is not configured, and emits a warning explaining that semantic results are omitted.
-- The CLI also emits a non-blocking warning on each non-config command run when embedding is not configured.
 - `category remove --force` detaches referenced transactions and child categories first.
 - `delete` removes both legs of a transfer automatically when the target transaction belongs to a transfer group.

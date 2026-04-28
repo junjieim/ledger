@@ -60,7 +60,6 @@ type BalanceResult struct {
 type SearchItem struct {
 	ID            string   `json:"id"`
 	Score         float64  `json:"score"`
-	MatchType     string   `json:"match_type"`
 	Direction     string   `json:"direction"`
 	Amount        float64  `json:"amount"`
 	Currency      string   `json:"currency"`
@@ -79,12 +78,4 @@ type TransferResult struct {
 	TransferGroup string       `json:"transfer_group"`
 	Expense       *Transaction `json:"expense"`
 	Income        *Transaction `json:"income"`
-}
-
-type EmbeddingConfig struct {
-	APIKey     string `json:"api_key,omitempty"`
-	ModelName  string `json:"model_name"`
-	ModelURL   string `json:"model_url"`
-	Dimensions int    `json:"dimensions"`
-	UpdatedAt  string `json:"updated_at,omitempty"`
 }

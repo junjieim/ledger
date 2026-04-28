@@ -53,8 +53,6 @@ func InitFresh(db *sql.DB) error {
 	tables := []string{
 		"keyword_index_hashes",
 		"transactions_search",
-		"transaction_embeddings",
-		"embedding_config",
 		"transaction_tags",
 		"tags",
 		"audit_log",
