@@ -4,13 +4,12 @@ BUILD_DIR := $(DIST_DIR)/build
 SKILL_DIST_DIR := $(DIST_DIR)/skill/$(APP)
 PACKAGE_DIR := $(DIST_DIR)/package
 RELEASE_DIR := $(DIST_DIR)/release
-SKILL_INSTALL_DIR ?= $(HOME)/.claude/skills/$(APP)
 MAIN_PKG := ./cmd/ledger
 GO ?= go
 LDFLAGS := -s -w
 PLATFORMS := darwin/arm64 darwin/amd64 linux/amd64 linux/arm64
 
-.PHONY: build build-cross clean release-package skill-package skill-package-cross skill-install-local verify-package verify-release-package
+.PHONY: build build-cross clean release-package skill-package skill-package-cross verify-package verify-release-package
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -64,13 +63,6 @@ verify-release-package: release-package
 		arch=$${target#*/}; \
 		test -f "$(RELEASE_DIR)/$(APP)-$$os-$$arch.tar.gz"; \
 	done
-
-skill-install-local: skill-package
-	rm -rf "$(SKILL_INSTALL_DIR)"
-	@mkdir -p "$(SKILL_INSTALL_DIR)/script" "$(SKILL_INSTALL_DIR)/example"
-	cp $(SKILL_DIST_DIR)/SKILL.md "$(SKILL_INSTALL_DIR)/SKILL.md"
-	rsync -a --delete $(SKILL_DIST_DIR)/example/ "$(SKILL_INSTALL_DIR)/example/"
-	cp $(SKILL_DIST_DIR)/script/$(APP) "$(SKILL_INSTALL_DIR)/script/$(APP)"
 
 clean:
 	rm -rf $(DIST_DIR)
